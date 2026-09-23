@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Corgi Dialer</title>
+<style>
+  :root {
+    --bg: #f6f5f3;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --accent: #3f6f5f;
+    --accent-dark: #2e5348;
+    --danger: #b3441f;
+    --border: #e4e2dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  select, input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 18px; }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-primary:disabled { background: #b9c4bf; cursor: not-allowed; }
+  .btn-hangup { background: var(--danger); color: #fff; width: 100%; margin-top: 18px; }
+  .status {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #cfcac2; }
+  .dot.live { background: #2e8b57; }
+  .dot.ringing { background: #d0a233; }
+  .outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .outcomes button {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-weight: 500;
+    padding: 10px 6px;
+  }
+  .outcomes button.selected {
+    border-color: var(--accent);
+    background: #eaf1ee;
+    color: var(--accent-dark);
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .rep-badge {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: -8px;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="card" id="app"></div>
+
+<script>window.DIALER_BACKEND_URL = "http://localhost:4000";</script>
+<script type="module">
+import { SignalWire, StaticCredentialProvider } from "https://esm.sh/@signalwire/js@latest?bundle";
+
+// ---- Config ----
+// Point this at wherever you deploy the backend from this project.
+const BACKEND_URL = window.DIALER_BACKEND_URL || "http://localhost:4000";
+
+const OUTCOMES = [
+  "Connected", "Voicemail", "DNC", "Busy", "No Answer",
+  "Receptionist", "High Interest", "Low Interest", "Hard No", "Wrong Number",
+];
+
+// ---- Tiny state / DOM helpers ----
+const app = document.getElementById("app");
+let secret = localStorage.getItem("dialerSecret") || "";
+let reps = [];
+let repEmail = localStorage.getItem("dialerRepEmail") || "";
+let repId = "";
+let call = null;
+let callStatus = "idle"; // idle | ringing | connected | ended
+let selectedOutcome = null;
+let dialedNumber = "";
+let callStartedAt = null;
+let remoteAudioEl = null;
+
+function headers() {
+  return { "Content-Type": "application/json", "x-dialer-secret": secret };
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
+    headers: { ...headers(), ...(options.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request to ${path} failed`);
+  }
+  return res.json();
+}
+
+async function loadReps() {
+  const data = await api("/api/reps");
+  reps = data.reps;
+}
+
+function render() {
+  if (!secret) return renderLogin();
+  if (!repEmail) return renderRepPicker();
+  if (callStatus === "ended") return renderOutcome();
+  return renderDialer();
+}
+
+function renderLogin() {
+  app.innerHTML = `
+    <h1>Corgi Dialer</h1>
+    <div class="sub">Enter the shared dialer password to continue.</div>
+    <label>Password</label>
+    <input type="password" id="secretInput" />
+    <button class="btn-primary" id="secretBtn">Continue</button>
+  `;
+  document.getElementById("secretBtn").onclick = async () => {
+    secret = document.getElementById("secretInput").value.trim();
+    try {
+      await api("/api/health");
+      localStorage.setItem("dialerSecret", secret);
+      render();
+    } catch (e) {
+      secret = "";
+      alert("Couldn't reach the backend - check the password and BACKEND_URL.");
+    }
+  };
+}
+
+async function renderRepPicker() {
+  app.innerHTML = `<h1>Corgi Dialer</h1><div class="sub">Loading reps…</div>`;
+  try {
+    await loadReps();
+  } catch (e) {
+    app.innerHTML = `<h1>Corgi Dialer</h1><div class="sub">${e.message}</div>`;
+    return;
+  }
+  app.innerHTML = `
+    <h1>Corgi Dialer</h1>
+    <div class="sub">Who's dialing?</div>
+    <label>Rep</label>
+    <select id="repSelect">
+      <option value="">Select a rep…</option>
+      ${reps.map(r => `<option value="${r.email}">${r.name} (${r.outboundNumber})</option>`).join("")}
+    </select>
+    <button class="btn-primary" id="repBtn">Start dialing</button>
+    ${reps.length === 0 ? `<div class="hint">No reps have an outbound number assigned yet. Set the "Outbound Caller ID" field on a workspace member in Twenty.</div>` : ""}
+  `;
+  document.getElementById("repBtn").onclick = () => {
+    const val = document.getElementById("repSelect").value;
+    if (!val) return;
+    repEmail = val;
+    repId = reps.find(r => r.email === val)?.id || "";
+    localStorage.setItem("dialerRepEmail", repEmail);
+    render();
+  };
+}
+
+function renderDialer() {
+  const rep = reps.find(r => r.email === repEmail);
+  const dotClass = callStatus === "connected" ? "live" : callStatus === "ringing" ? "ringing" : "";
+  app.innerHTML = `
+    <h1>Corgi Dialer</h1>
+    <div class="rep-badge">Dialing as ${rep ? rep.name : repEmail} &middot; caller ID ${rep ? rep.outboundNumber : ""} &middot; <a href="#" id="switchRep">switch</a></div>
+    <label>Number to call</label>
+    <input type="text" id="numberInput" placeholder="+15551234567" value="${dialedNumber}" ${callStatus !== "idle" ? "disabled" : ""} />
+    <div class="hint">Use E.164 format, e.g. +15551234567</div>
+    ${callStatus === "idle"
+      ? `<button class="btn-primary" id="callBtn">Call</button>`
+      : `<button class="btn-hangup" id="hangupBtn">Hang up</button>`}
+    <div class="status"><span class="dot ${dotClass}"></span>${statusLabel()}</div>
+    <audio id="remoteAudio" autoplay></audio>
+  `;
+  remoteAudioEl = document.getElementById("remoteAudio");
+  document.getElementById("switchRep").onclick = (e) => {
+    e.preventDefault();
+    repEmail = "";
+    localStorage.removeItem("dialerRepEmail");
+    render();
+  };
+  if (callStatus === "idle") {
+    document.getElementById("callBtn").onclick = placeCall;
+  } else {
+    document.getElementById("hangupBtn").onclick = hangUp;
+  }
+}
+
+function statusLabel() {
+  if (callStatus === "idle") return "Ready";
+  if (callStatus === "ringing") return "Ringing…";
+  if (callStatus === "connected") return "On the call";
+  return "Call ended";
+}
+
+async function placeCall() {
+  const input = document.getElementById("numberInput");
+  dialedNumber = input.value.trim();
+  if (!dialedNumber) return;
+
+  callStatus = "ringing";
+  render();
+
+  try {
+    const { token } = await api("/api/token", {
+      method: "POST",
+      body: JSON.stringify({ repEmail }),
+    });
+
+    const client = new SignalWire(new StaticCredentialProvider({ token }));
+    call = await client.dial(dialedNumber, { audio: true, video: false });
+
+    call.remoteStream$.subscribe((stream) => {
+      if (remoteAudioEl) remoteAudioEl.srcObject = stream;
+    });
+
+    call.status$.subscribe((status) => {
+      if (status === "connected" || status === "active") {
+        callStartedAt = Date.now();
+        callStatus = "connected";
+        render();
+      }
+      if (status === "disconnected" || status === "ended" || status === "hangup") {
+        callStatus = "ended";
+        render();
+      }
+    });
+  } catch (e) {
+    alert(`Couldn't place the call: ${e.message}`);
+    callStatus = "idle";
+    render();
+  }
+}
+
+function hangUp() {
+  if (call) call.hangup();
+  callStatus = "ended";
+  render();
+}
+
+function renderOutcome() {
+  const durationSeconds = callStartedAt ? Math.round((Date.now() - callStartedAt) / 1000) : 0;
+  app.innerHTML = `
+    <h1>Log this call</h1>
+    <div class="sub">${dialedNumber} &middot; ${durationSeconds ? durationSeconds + "s" : "not connected"}</div>
+    <label>Outcome</label>
+    <div class="outcomes" id="outcomeGrid">
+      ${OUTCOMES.map(o => `<button data-outcome="${o}">${o}</button>`).join("")}
+    </div>
+    <label>Notes</label>
+    <textarea id="notesInput" placeholder="Optional notes…"></textarea>
+    <button class="btn-primary" id="saveBtn" disabled>Save &amp; dial next</button>
+  `;
+  document.querySelectorAll("#outcomeGrid button").forEach((btn) => {
+    btn.onclick = () => {
+      selectedOutcome = btn.dataset.outcome;
+      document.querySelectorAll("#outcomeGrid button").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      document.getElementById("saveBtn").disabled = false;
+    };
+  });
+  document.getElementById("saveBtn").onclick = saveOutcome;
+}
+
+async function saveOutcome() {
+  const notes = document.getElementById("notesInput").value.trim();
+  const durationSeconds = callStartedAt ? Math.round((Date.now() - callStartedAt) / 1000) : 0;
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  try {
+    let personId = null, companyId = null, name = null;
+    try {
+      const lookup = await api(`/api/people/lookup?phone=${encodeURIComponent(dialedNumber)}`);
+      if (lookup.person) {
+        personId = lookup.person.id;
+        companyId = lookup.person.companyId || null;
+        const n = lookup.person.name;
+        name = n ? [n.firstName, n.lastName].filter(Boolean).join(" ") : null;
+      }
+    } catch { /* lookup is best-effort, don't block saving the call */ }
+
+    await api("/api/calls", {
+      method: "POST",
+      body: JSON.stringify({
+        repId,
+        phone: dialedNumber,
+        outcome: OUTCOME_VALUES[selectedOutcome] || selectedOutcome,
+        notes,
+        durationSeconds,
+        personId,
+        companyId,
+        name,
+      }),
+    });
+
+    // Reset for the next call.
+    call = null;
+    callStatus = "idle";
+    selectedOutcome = null;
+    dialedNumber = "";
+    callStartedAt = null;
+    render();
+  } catch (e) {
+    alert(`Couldn't save the call: ${e.message}`);
+    btn.disabled = false;
+    btn.textContent = "Save & dial next";
+  }
+}
+
+// Twenty stores outcome as the SELECT value (e.g. HIGH_INTEREST), not the label.
+const OUTCOME_VALUES = {
+  "Connected": "CONNECTED",
+  "Voicemail": "VOICEMAIL",
+  "DNC": "DNC",
+  "Busy": "BUSY",
+  "No Answer": "NO_ANSWER",
+  "Receptionist": "RECEPTIONIST",
+  "High Interest": "HIGH_INTEREST",
+  "Low Interest": "LOW_INTEREST",
+  "Hard No": "HARD_NO",
+  "Wrong Number": "WRONG_NUMBER",
+};
+
+render();
+</script>
+</body>
+</html>
