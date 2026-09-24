@@ -52,6 +52,11 @@ jobs:
         run: corepack enable
 
       - name: Install the app's parts
+        # yarn.lock can be out of date when the code was edited on a machine
+        # without Yarn; let the install refresh it instead of stopping.
+        # (The Twenty packages are pinned to exact versions in package.json.)
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
         run: yarn install
 
       - name: Safety checks (types and tests must pass before anything is installed)
