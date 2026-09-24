@@ -70,4 +70,23 @@ jobs:
       - name: Install into Twenty
         # Without --force, anything that would DELETE data stops here instead
         # of running unattended.
-        run: yarn twenty apply
+        #
+        # The very last thing "apply" does, after the app is fully installed,
+        # is generate optional helper code. Twenty Cloud blocks that step for
+        # API keys ("GraphQL introspection has been disabled"). This app doesn't
+        # use that helper code, so that one failure is treated as success.
+        # Any other failure still fails the run.
+        shell: bash
+        run: |
+          set +e
+          yarn twenty apply 2>&1 | tee apply.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          if grep -q "Syncing manifest" apply.log && grep -q "Failed to generate API client" apply.log; then
+            echo "::notice::Dialer installed in Twenty. Skipped the optional helper-code step that Twenty Cloud blocks for API keys."
+            exit 0
+          fi
+          exit "$status"
