@@ -17,6 +17,11 @@ on:
       - 'twenty-app/**'
       - '.github/workflows/deploy-twenty-app.yml'
   workflow_dispatch:
+    inputs:
+      remove_deleted:
+        description: 'Also remove pieces deleted from the code (for example a removed button)'
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-twenty-app
@@ -28,6 +33,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: twenty-app
@@ -68,8 +74,6 @@ jobs:
         run: yarn twenty remote:add --url "$TWENTY_URL" --api-key "$TWENTY_API_KEY"
 
       - name: Install into Twenty
-        # Without --force, anything that would DELETE data stops here instead
-        # of running unattended.
         #
         # The very last thing "apply" does, after the app is fully installed,
         # is generate optional helper code. Twenty Cloud blocks that step for
@@ -78,8 +82,17 @@ jobs:
         # Any other failure still fails the run.
         shell: bash
         run: |
+          # Automatic runs never delete anything from Twenty (--no-delete).
+          # A manual run with "remove_deleted" ticked removes pieces that were
+          # deleted from the code (--force skips the typed confirmation).
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.remove_deleted }}" = "true" ]; then
+            APPLY_FLAGS="--force"
+          else
+            APPLY_FLAGS="--no-delete"
+          fi
+          echo "Running: yarn twenty apply $APPLY_FLAGS"
           set +e
-          yarn twenty apply 2>&1 | tee apply.log
+          yarn twenty apply $APPLY_FLAGS 2>&1 | tee apply.log
           status=${PIPESTATUS[0]}
           set -e
           if [ "$status" -eq 0 ]; then

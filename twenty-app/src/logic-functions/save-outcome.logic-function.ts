@@ -67,6 +67,17 @@ const handler = async (
     signalWireCallId: call.callSid,
     personId: call.personId,
     companyId: person?.companyId ?? null,
+    ...(call.repName ? { rep: call.repName } : {}),
+    ...(call.recordingUrl
+      ? {
+          recording: {
+            primaryLinkUrl: call.recordingUrl,
+            primaryLinkLabel: 'Play recording',
+            secondaryLinks: null,
+          },
+          recordingSeconds: call.recordingSeconds ?? 0,
+        }
+      : {}),
   };
 
   let recordId: string;
@@ -74,13 +85,14 @@ const handler = async (
     if (call.loggedRecordId) {
       await updateRecord('dialerCalls', call.loggedRecordId, data);
       recordId = call.loggedRecordId;
+      await updateCall(call.callSid, { outcomeSaved: true });
     } else {
       const created = await createRecord<{ id: string }>('dialerCalls', data);
       if (!created?.id) {
         return { ok: false as const, message: 'Twenty did not confirm the save. Try again.' };
       }
       recordId = created.id;
-      await updateCall(call.callSid, { loggedRecordId: created.id });
+      await updateCall(call.callSid, { loggedRecordId: created.id, outcomeSaved: true });
     }
   } catch (error) {
     return {

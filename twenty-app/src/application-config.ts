@@ -5,6 +5,7 @@ import {
   APP_DISPLAY_NAME,
   APPLICATION_UNIVERSAL_IDENTIFIER,
   VAR_DIALER_REPS_ID,
+  VAR_RECORDING_ANNOUNCEMENT_ID,
   VAR_SIGNALWIRE_API_TOKEN_ID,
   VAR_SIGNALWIRE_PROJECT_ID_ID,
   VAR_SIGNALWIRE_SIGNING_KEY_ID,
@@ -41,6 +42,14 @@ export default defineApplication({
       description:
         'SignalWire dashboard > API Credentials > Signing Key. When filled in, the dialer ignores any call update that did not come from SignalWire.',
       isSecret: true,
+    },
+    RECORDING_ANNOUNCEMENT: {
+      universalIdentifier: VAR_RECORDING_ANNOUNCEMENT_ID,
+      label: 'Recording announcement',
+      description:
+        'Said to the person being called when they pick up, before they are connected. Several states (including Illinois and California) require everyone on a call to agree to recording. Clear this only if you are sure you do not need it.',
+      isSecret: false,
+      value: 'Hello. This call may be recorded for quality and training purposes.',
     },
     DIALER_REPS: {
       universalIdentifier: VAR_DIALER_REPS_ID,

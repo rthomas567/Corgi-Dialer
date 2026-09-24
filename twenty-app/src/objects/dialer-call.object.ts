@@ -17,9 +17,14 @@ import {
   DIALER_CALL_OUTCOME_FIELD_ID,
   DIALER_CALL_PERSON_FIELD_ID,
   DIALER_CALL_PHONE_FIELD_ID,
+  DIALER_CALL_RECORDING_FIELD_ID,
+  DIALER_CALL_RECORDING_SECONDS_FIELD_ID,
+  DIALER_CALL_REP_FIELD_ID,
+  DIALER_CALL_RESULT_FIELD_ID,
   DIALER_CALL_SID_FIELD_ID,
   PERSON_DIALER_CALLS_FIELD_ID,
 } from 'src/constants/universal-identifiers';
+import { CALL_RESULTS } from 'src/shared/call-results';
 import { CALL_OUTCOMES } from 'src/shared/outcomes';
 
 // One record per call made from the dialer. "Created by" shows which rep made it.
@@ -52,6 +57,43 @@ export default defineObject({
         color: outcome.color,
         position,
       })),
+    },
+    {
+      universalIdentifier: DIALER_CALL_REP_FIELD_ID,
+      type: FieldType.TEXT,
+      name: 'rep',
+      label: 'Rep',
+      icon: 'IconUserCircle',
+      description: 'The rep who made the call.',
+    },
+    {
+      universalIdentifier: DIALER_CALL_RESULT_FIELD_ID,
+      type: FieldType.SELECT,
+      name: 'callResult',
+      label: 'Call result',
+      icon: 'IconPhoneCall',
+      description: 'Filled in automatically from the phone line.',
+      options: CALL_RESULTS.map((result, position) => ({
+        value: result.value,
+        label: result.label,
+        color: result.color,
+        position,
+      })),
+    },
+    {
+      universalIdentifier: DIALER_CALL_RECORDING_FIELD_ID,
+      type: FieldType.LINKS,
+      name: 'recording',
+      label: 'Recording',
+      icon: 'IconPlayerPlay',
+      description: 'Click to play the call recording.',
+    },
+    {
+      universalIdentifier: DIALER_CALL_RECORDING_SECONDS_FIELD_ID,
+      type: FieldType.NUMBER,
+      name: 'recordingSeconds',
+      label: 'Recording length (seconds)',
+      icon: 'IconClock',
     },
     {
       universalIdentifier: DIALER_CALL_NOTES_FIELD_ID,

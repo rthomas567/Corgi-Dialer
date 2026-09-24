@@ -5,6 +5,8 @@ import {
   BRIDGE_FUNCTION_ID,
   ROUTE_BRIDGE,
   ROUTE_CALL_EVENTS,
+  ROUTE_RECORDING_READY,
+  ROUTE_WHISPER,
 } from 'src/constants/universal-identifiers';
 import { getCall, updateCall } from 'src/shared/call-store';
 import { escapeXml, lamlResponse } from 'src/shared/laml';
@@ -29,14 +31,24 @@ const handler = async (event: RoutePayload) => {
     return lamlResponse('<Say>This call could not be connected.</Say><Hangup/>');
   }
 
-  await updateCall(call.callSid, { stage: 'prospect-ringing' });
+  await updateCall(call.callSid, { stage: 'prospect-ringing', repAnswered: true });
 
-  const eventsUrl = escapeXml(`${functionsBaseUrl()}${ROUTE_CALL_EVENTS}`);
+  const base = functionsBaseUrl();
+  const eventsUrl = escapeXml(`${base}${ROUTE_CALL_EVENTS}`);
+  const recordingUrl = escapeXml(`${base}${ROUTE_RECORDING_READY}`);
+  // When the person picks up, they hear the recording announcement before
+  // being connected (the rep keeps hearing ringing meanwhile).
+  const announcement = (process.env.RECORDING_ANNOUNCEMENT ?? '').trim();
+  const whisperAttribute = announcement
+    ? ` url="${escapeXml(`${base}${ROUTE_WHISPER}`)}" method="POST"`
+    : '';
 
   return lamlResponse(
     `<Say>Connecting.</Say>` +
-      `<Dial callerId="${escapeXml(call.callerId)}" timeout="30" answerOnBridge="true">` +
-      `<Number statusCallback="${eventsUrl}" statusCallbackMethod="POST" statusCallbackEvent="ringing answered completed">` +
+      `<Dial callerId="${escapeXml(call.callerId)}" timeout="30" answerOnBridge="true"` +
+      ` record="record-from-answer" recordingStatusCallback="${recordingUrl}"` +
+      ` recordingStatusCallbackMethod="POST" recordingStatusCallbackEvent="completed">` +
+      `<Number statusCallback="${eventsUrl}" statusCallbackMethod="POST" statusCallbackEvent="ringing answered completed"${whisperAttribute}>` +
       escapeXml(call.prospectNumber) +
       `</Number></Dial>`,
   );

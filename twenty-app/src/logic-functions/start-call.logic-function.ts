@@ -10,20 +10,31 @@ import {
   ROUTE_START_CALL,
   START_CALL_FUNCTION_ID,
 } from 'src/constants/universal-identifiers';
-import { saveCall } from 'src/shared/call-store';
+import {
+  callNeedsOutcome,
+  getRepLatestCall,
+  isCallActive,
+  saveCall,
+  setRepLatestCall,
+} from 'src/shared/call-store';
 import { getDoNotCallStatus } from 'src/shared/dnc';
 import { toDialableNumber, type TwentyPhones } from 'src/shared/phone';
 import { readJsonBody } from 'src/shared/route-body';
 import { readRepSettings, readSignalWireSettings } from 'src/shared/settings';
 import { ringRepPhone } from 'src/shared/signalwire';
-import { functionsBaseUrl, getRecord } from 'src/shared/twenty-api';
+import { createRecord, functionsBaseUrl, getRecord } from 'src/shared/twenty-api';
 
 type Person = {
   id: string;
+  name?: { firstName?: string; lastName?: string } | null;
   phones?: TwentyPhones;
   companyId?: string | null;
 };
-type WorkspaceMember = { id: string; userEmail?: string | null };
+type WorkspaceMember = {
+  id: string;
+  userEmail?: string | null;
+  name?: { firstName?: string; lastName?: string } | null;
+};
 
 const fail = (message: string) => ({ ok: false as const, message });
 
@@ -34,6 +45,19 @@ const handler = async (
   const workspaceMemberId = context.workspaceMemberId;
   if (!workspaceMemberId) {
     return fail('You need to be signed in to Twenty to place a call.');
+  }
+
+  // One call at a time, and every answered call needs an outcome before the next.
+  const latest = await getRepLatestCall(workspaceMemberId);
+  if (callNeedsOutcome(latest)) {
+    return {
+      ok: false as const,
+      needsOutcome: true as const,
+      message: 'Pick an outcome for your last call before starting a new one.',
+    };
+  }
+  if (isCallActive(latest)) {
+    return fail("You're already on a call. Hang up that call first.");
   }
 
   const { personId } = readJsonBody<{ personId: string }>(event);
@@ -86,6 +110,34 @@ const handler = async (
     return fail(error instanceof Error ? error.message : 'SignalWire could not start the call.');
   }
 
+  const createdAt = new Date().toISOString();
+  const repName =
+    [member.name?.firstName, member.name?.lastName].filter(Boolean).join(' ') ||
+    member.userEmail;
+  const personName =
+    [person.name?.firstName, person.name?.lastName].filter(Boolean).join(' ') ||
+    'Unknown person';
+
+  // Create the Dialer Call record now (as the rep, so "Created by" is the rep).
+  // The phone line result and the recording get filled in as they arrive,
+  // even if the rep never picks an outcome.
+  let loggedRecordId: string | undefined;
+  try {
+    const record = await createRecord<{ id: string }>('dialerCalls', {
+      name: `${personName} (call)`,
+      rep: repName,
+      callResult: 'IN_PROGRESS',
+      phoneNumber: prospectNumber,
+      calledAt: createdAt,
+      signalWireCallId: callSid,
+      personId,
+      companyId: person.companyId ?? null,
+    });
+    loggedRecordId = record?.id;
+  } catch {
+    // Not fatal: the call is already ringing. Saving an outcome creates the record.
+  }
+
   await saveCall({
     callSid,
     workspaceMemberId,
@@ -93,8 +145,11 @@ const handler = async (
     prospectNumber,
     callerId: rep.callerId,
     stage: 'starting',
-    createdAt: new Date().toISOString(),
+    repName,
+    loggedRecordId,
+    createdAt,
   });
+  await setRepLatestCall(workspaceMemberId, callSid);
 
   return { ok: true as const, callSid, prospectNumber };
 };

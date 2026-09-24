@@ -17,7 +17,8 @@ export const CALL_EVENTS_FUNCTION_ID = '6e903fa4-0907-43d4-8c8e-edd5ded5aba0';
 export const CALL_STATUS_FUNCTION_ID = 'ede01fd8-f3a9-42ca-ad67-a8a922962fd2';
 export const HANG_UP_FUNCTION_ID = '153db5ee-44fe-4c02-9b17-dd0728ebc6a4';
 
-// Dialer panel + Call button
+// Removed in version 7 (the small Call button and its side panel). Kept so the
+// IDs are never reused.
 export const DIALER_PANEL_FRONT_COMPONENT_ID = 'ee7dae32-47af-479a-afb1-506dcd54bf8b';
 export const CALL_PERSON_COMMAND_MENU_ITEM_ID = 'ddd9abf4-6d54-4f8b-b77a-2ba2fbe20bf0';
 
@@ -49,3 +50,42 @@ export const COMPANY_DIALER_CALLS_FIELD_ID = 'dbf19755-42d8-4a7c-a95c-f106c83fa2
 // Version 3: Do Not Call handling
 export const CALL_CHECK_FUNCTION_ID = '229f7452-8d2b-4f45-ba6d-f9ddf148528d';
 export const ROUTE_CALL_CHECK = '/dialer/call-check';
+
+// Version 4: call recording
+export const VAR_RECORDING_ANNOUNCEMENT_ID = '7bae7178-87f3-4b66-95cd-17a3dc88386c';
+export const RECORDING_READY_FUNCTION_ID = '509084ef-711f-4bc7-8c9a-a915503f773b';
+export const WHISPER_FUNCTION_ID = 'b5afc768-c808-4d32-b05f-7d789ff70a6d';
+export const ROUTE_RECORDING_READY = '/dialer/recording-ready';
+export const ROUTE_WHISPER = '/dialer/whisper';
+
+export const DIALER_CALL_RECORDING_FIELD_ID = '75aa8d29-1f40-431a-a2c2-2d98f25ac6e3';
+export const DIALER_CALL_RECORDING_SECONDS_FIELD_ID = '7b6bc744-f61a-4afb-bbaf-d0f1b30604c8';
+export const DIALER_CALL_RESULT_FIELD_ID = '006d3817-93f8-4b6c-b26c-ddc5ffa73ae8';
+export const DIALER_CALL_REP_FIELD_ID = '27afa349-4034-4be8-b8c3-a10b7a3250fc';
+
+export const RECORDED_CALLS_VIEW_ID = 'ad52e088-fae0-46f2-950a-b859d8752dd3';
+export const RECORDED_CALLS_FILTER_ID = '02e34f54-5c15-488a-8a69-71329d4c86d6';
+export const RECORDED_CALLS_SORT_ID = 'ea493a6a-6944-477f-94c8-d5f5d93aea11';
+export const RECORDED_CALLS_NAV_ITEM_ID = '72172f31-c79f-4bec-a04d-c804dea34025';
+export const RECORDED_CALLS_VIEW_FIELD_IDS = [
+  'b7149b70-b2be-42bc-8fce-1a5ab2b3c263',
+  '5c1049bf-32bb-41de-be80-88a6c4545135',
+  '0d93f4a7-63e3-4711-86ff-8bcfd0a6ca70',
+  '485482f2-59f6-44be-bc30-ec39d0b71771',
+  'c95cc4ed-5e52-4208-9802-b63aa9fcc6bf',
+  'af072548-0d2f-4a7b-8277-b39a631bb5de',
+  'bdd811d2-3613-40eb-8698-d95649e0f705',
+  '0726335f-9dbf-4f39-91a8-b852452908c9',
+  'b7758d42-d2df-428b-8d9b-2072ce7c4c9d',
+] as const;
+
+
+// Version 5: big orange Call box on the person page + required outcome
+export const MY_CALL_FUNCTION_ID = 'a9f50c05-77c9-46d2-89f1-ccbf12e17c1a';
+export const ROUTE_MY_CALL = '/dialer/my-call';
+export const PERSON_CALL_WIDGET_ID = 'abc963fe-b784-485c-9940-ad3ced684c12';
+export const PERSON_CALL_BOX_FRONT_COMPONENT_ID = 'e8f2c20f-cb16-496c-92c3-105cf756cf33';
+
+// Version 6: big Do Not Call warnings (person page + company page)
+export const COMPANY_DNC_BOX_FRONT_COMPONENT_ID = '5a27ab98-e569-43fb-aca8-bd2c670e0b83';
+export const COMPANY_DNC_WIDGET_ID = '64d2b695-3ff1-4a7f-8fc6-d6106f68ca27';

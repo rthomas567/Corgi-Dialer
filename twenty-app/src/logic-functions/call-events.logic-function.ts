@@ -8,6 +8,7 @@ import {
 import { getCall, updateCall } from 'src/shared/call-store';
 import { lamlResponse } from 'src/shared/laml';
 import { readFormBody } from 'src/shared/route-body';
+import { syncCallResult } from 'src/shared/sync-record';
 import { SIGNATURE_HEADERS } from 'src/shared/signalwire-signature';
 import { isFromSignalWire } from 'src/shared/verify-signalwire';
 
@@ -36,19 +37,23 @@ const handler = async (event: RoutePayload) => {
     if (status === 'ringing' && call.stage !== 'connected') {
       await updateCall(call.callSid, { stage: 'prospect-ringing' });
     } else if (status === 'in-progress' || status === 'answered') {
-      await updateCall(call.callSid, { stage: 'connected', connectedAt: now });
+      await syncCallResult(await updateCall(call.callSid, { stage: 'connected', connectedAt: now }));
     } else if (FINISHED.has(status) && call.stage !== 'ended') {
-      await updateCall(call.callSid, {
-        stage: 'ended',
-        endedAt: now,
-        endReason: status === 'completed' ? 'completed' : `prospect-${status}`,
-        durationSeconds: call.connectedAt ? duration : 0,
-      });
+      await syncCallResult(
+        await updateCall(call.callSid, {
+          stage: 'ended',
+          endedAt: now,
+          endReason: status === 'completed' ? 'completed' : `prospect-${status}`,
+          durationSeconds: call.connectedAt ? duration : 0,
+        }),
+      );
     } else if (FINISHED.has(status) && call.durationSeconds == null) {
       // The rep hung up from the panel first; still record how long they talked.
-      await updateCall(call.callSid, {
-        durationSeconds: call.connectedAt ? duration : 0,
-      });
+      await syncCallResult(
+        await updateCall(call.callSid, {
+          durationSeconds: call.connectedAt ? duration : 0,
+        }),
+      );
     }
     return lamlResponse('');
   }
@@ -59,11 +64,13 @@ const handler = async (event: RoutePayload) => {
     await updateCall(call.callSid, { stage: 'rep-ringing' });
   } else if (FINISHED.has(status) && call.stage !== 'ended') {
     const repNeverAnswered = call.stage === 'starting' || call.stage === 'rep-ringing';
-    await updateCall(call.callSid, {
-      stage: 'ended',
-      endedAt: now,
-      endReason: repNeverAnswered ? `rep-${status}` : 'completed',
-    });
+    await syncCallResult(
+      await updateCall(call.callSid, {
+        stage: 'ended',
+        endedAt: now,
+        endReason: repNeverAnswered ? `rep-${status}` : 'completed',
+      }),
+    );
   }
 
   return lamlResponse('');

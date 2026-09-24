@@ -12,6 +12,7 @@ import { getCall, updateCall } from 'src/shared/call-store';
 import { readJsonBody } from 'src/shared/route-body';
 import { readSignalWireSettings } from 'src/shared/settings';
 import { endCall } from 'src/shared/signalwire';
+import { syncCallResult } from 'src/shared/sync-record';
 
 const handler = async (
   event: RoutePayload,
@@ -38,11 +39,13 @@ const handler = async (
         message: error instanceof Error ? error.message : 'Could not hang up.',
       };
     }
-    await updateCall(call.callSid, {
-      stage: 'ended',
-      endedAt: new Date().toISOString(),
-      endReason: 'hung-up',
-    });
+    await syncCallResult(
+      await updateCall(call.callSid, {
+        stage: 'ended',
+        endedAt: new Date().toISOString(),
+        endReason: 'hung-up',
+      }),
+    );
   }
 
   return { ok: true as const };

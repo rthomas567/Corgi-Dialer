@@ -25,14 +25,27 @@ vi.mock('src/shared/twenty-api', () => ({
 }));
 
 const storedCalls: Record<string, any> = {};
-vi.mock('src/shared/call-store', () => ({
-  getCall: async (sid: string) => storedCalls[sid] ?? null,
-  updateCall: async (sid: string, changes: Record<string, unknown>) => {
-    storedCalls[sid] = { ...storedCalls[sid], ...changes };
-    return storedCalls[sid];
-  },
-  saveCall: async () => undefined,
-}));
+const latestCallByRep: Record<string, string> = {};
+vi.mock('src/shared/call-store', async () => {
+  const actual = await vi.importActual<typeof import('src/shared/call-store')>('src/shared/call-store');
+  return {
+    getCall: async (sid: string) => storedCalls[sid] ?? null,
+    updateCall: async (sid: string, changes: Record<string, unknown>) => {
+      storedCalls[sid] = { ...storedCalls[sid], ...changes };
+      return storedCalls[sid];
+    },
+    saveCall: async (call: any) => {
+      storedCalls[call.callSid] = call;
+    },
+    setRepLatestCall: async (memberId: string, sid: string) => {
+      latestCallByRep[memberId] = sid;
+    },
+    getRepLatestCall: async (memberId: string) =>
+      latestCallByRep[memberId] ? storedCalls[latestCallByRep[memberId]] ?? null : null,
+    isCallActive: actual.isCallActive,
+    callNeedsOutcome: actual.callNeedsOutcome,
+  };
+});
 
 const dialed: string[] = [];
 vi.mock('src/shared/signalwire', () => ({
@@ -45,6 +58,9 @@ vi.mock('src/shared/signalwire', () => ({
 
 import { getDoNotCallStatus, isCalendarDate, isCompanyDoNotCall } from 'src/shared/dnc';
 import startCall from 'src/logic-functions/start-call.logic-function';
+import bridge from 'src/logic-functions/bridge.logic-function';
+import myCall from 'src/logic-functions/my-call.logic-function';
+import { callNeedsOutcome, isCallActive } from 'src/shared/call-store';
 import saveOutcome from 'src/logic-functions/save-outcome.logic-function';
 
 const handler = saveOutcome.config.handler as (event: any, context: any) => Promise<any>;
@@ -58,6 +74,7 @@ beforeEach(() => {
   for (const key of Object.keys(records)) delete records[key];
   for (const key of Object.keys(lists)) delete lists[key];
   for (const key of Object.keys(storedCalls)) delete storedCalls[key];
+  for (const key of Object.keys(latestCallByRep)) delete latestCallByRep[key];
   updates.length = 0;
   creates.length = 0;
   failCompanyUpdates = false;
@@ -81,13 +98,20 @@ describe('Do Not Call rules', () => {
     records['companies:c1'].leadStatus = 'DNC';
     const status = await getDoNotCallStatus('p1');
     expect(status.doNotCall).toBe(true);
+    expect(status.scope).toBe('company');
     expect(status.reason).toContain('Acme Realty');
+  });
+
+  it('blocks a second person at the same DNC company too', async () => {
+    records['companies:c1'].dnc = true;
+    records['people:p9'] = { id: 'p9', companyId: 'c1' };
+    expect(await getDoNotCallStatus('p9')).toMatchObject({ doNotCall: true, scope: 'company' });
   });
 
   it('blocks a person with no company after a DNC call', async () => {
     records['people:p2'] = { id: 'p2', companyId: null };
     lists.dialerCalls = [{ id: 'x', outcome: 'VOICEMAIL' }, { id: 'y', outcome: 'DNC' }];
-    expect((await getDoNotCallStatus('p2')).doNotCall).toBe(true);
+    expect(await getDoNotCallStatus('p2')).toMatchObject({ doNotCall: true, scope: 'person' });
   });
 
   it('allows calling otherwise', async () => {
@@ -183,6 +207,104 @@ describe('starting a call', () => {
   it('refuses when only the Lead Status says DNC', async () => {
     records['companies:c1'].leadStatus = 'DNC';
     expect((await start(eventWith({ personId: 'p1' }), context)).ok).toBe(false);
+    expect(dialed).toEqual([]);
+  });
+});
+
+describe('an outcome is required after every answered call', () => {
+  const start = startCall.config.handler as (event: any, context: any) => Promise<any>;
+  const save = saveOutcome.config.handler as (event: any, context: any) => Promise<any>;
+  const answer = bridge.config.handler as (event: any) => Promise<any>;
+  const mine = myCall.config.handler as (event: any, context: any) => Promise<any>;
+  const endCall = (sid: string, endReason = 'completed') => {
+    storedCalls[sid] = { ...storedCalls[sid], stage: 'ended', endReason };
+  };
+
+  beforeEach(() => {
+    dialed.length = 0;
+    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
+    process.env.SIGNALWIRE_PROJECT_ID = 'project';
+    process.env.SIGNALWIRE_API_TOKEN = 'token';
+    process.env.DIALER_REPS = JSON.stringify({
+      'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
+    });
+    records['workspaceMembers:rep-1'] = { id: 'rep-1', userEmail: 'ricky@beagleforpm.com' };
+    records['people:p1'].phones = { primaryPhoneNumber: '5551234567', primaryPhoneCallingCode: '+1' };
+    delete storedCalls.CA1;
+  });
+
+  it('blocks the next call until the last one has an outcome, then allows it', async () => {
+    expect((await start(eventWith({ personId: 'p1' }), context)).ok).toBe(true);
+    await answer(eventWith({ CallSid: 'CA-new' }));
+    expect(storedCalls['CA-new'].repAnswered).toBe(true);
+    endCall('CA-new');
+
+    const blocked = await start(eventWith({ personId: 'p1' }), context);
+    expect(blocked).toMatchObject({ ok: false, needsOutcome: true });
+    expect(dialed).toHaveLength(1);
+
+    const pending = await mine(eventWith({}), context);
+    expect(pending.call).toMatchObject({ callSid: 'CA-new', needsOutcome: true, personName: 'Jane Doe' });
+
+    expect((await save(eventWith({ callSid: 'CA-new', outcome: 'VOICEMAIL', localDate: '2026-09-24' }), context)).ok).toBe(true);
+    expect(storedCalls['CA-new'].outcomeSaved).toBe(true);
+    expect((await mine(eventWith({}), context)).call).toBeNull();
+    expect((await start(eventWith({ personId: 'p1' }), context)).ok).toBe(true);
+  });
+
+  it('refuses a second call while one is still going', async () => {
+    await start(eventWith({ personId: 'p1' }), context);
+    const second = await start(eventWith({ personId: 'p1' }), context);
+    expect(second.ok).toBe(false);
+    expect(second.message).toContain('already on a call');
+    expect((await mine(eventWith({}), context)).call).toMatchObject({ isActive: true, needsOutcome: false });
+  });
+
+  it("doesn't require an outcome if the rep never picked up", async () => {
+    await start(eventWith({ personId: 'p1' }), context);
+    endCall('CA-new', 'rep-no-answer');
+    expect((await start(eventWith({ personId: 'p1' }), context)).ok).toBe(true);
+  });
+
+  it('treats a call stuck for over 2 hours as finished', () => {
+    const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const stuck: any = { callSid: 'x', stage: 'connected', createdAt: old, repAnswered: true };
+    expect(isCallActive(stuck)).toBe(false);
+    expect(callNeedsOutcome(stuck)).toBe(true);
+    expect(callNeedsOutcome({ ...stuck, outcomeSaved: true })).toBe(false);
+  });
+});
+
+describe('after a DNC outcome is saved', () => {
+  const start = startCall.config.handler as (event: any, context: any) => Promise<any>;
+  const save = saveOutcome.config.handler as (event: any, context: any) => Promise<any>;
+
+  beforeEach(() => {
+    dialed.length = 0;
+    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
+    process.env.SIGNALWIRE_PROJECT_ID = 'project';
+    process.env.SIGNALWIRE_API_TOKEN = 'token';
+    process.env.DIALER_REPS = JSON.stringify({
+      'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
+    });
+    records['workspaceMembers:rep-1'] = { id: 'rep-1', userEmail: 'ricky@beagleforpm.com' };
+    records['people:p1'].phones = { primaryPhoneNumber: '5551234567', primaryPhoneCallingCode: '+1' };
+    records['people:p9'] = { id: 'p9', companyId: 'c1', phones: { primaryPhoneNumber: '5557654321', primaryPhoneCallingCode: '+1' } };
+  });
+
+  it('nobody at that company can be dialed afterwards, and SignalWire is never contacted', async () => {
+    // A fake updateRecord records changes; apply them so the company really becomes DNC.
+    await save(eventWith({ callSid: 'CA1', outcome: 'DNC', localDate: '2026-09-24' }), context);
+    for (const u of updates.filter((x) => x.object === 'companies')) {
+      Object.assign(records[`companies:${u.id}`], u.data);
+    }
+    expect(records['companies:c1']).toMatchObject({ dnc: true, leadStatus: 'DNC' });
+
+    const samePerson = await start(eventWith({ personId: 'p1' }), context);
+    const coworker = await start(eventWith({ personId: 'p9' }), context);
+    expect(samePerson.ok).toBe(false);
+    expect(coworker.ok).toBe(false);
+    expect(coworker.message).toContain('Do Not Call');
     expect(dialed).toEqual([]);
   });
 });

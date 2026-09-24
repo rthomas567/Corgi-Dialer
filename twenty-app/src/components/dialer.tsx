@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { RestApiClient } from 'twenty-client-sdk/rest';
-import { defineFrontComponent } from 'twenty-sdk/define';
-import { useSelectedRecordIds } from 'twenty-sdk/front-component';
+import {
+  openCommandConfirmationModal,
+  useRecordId,
+  useSelectedRecordIds,
+} from 'twenty-sdk/front-component';
 import { IconCheck, IconPhone, IconX } from 'twenty-ui/icon';
 import { useTheme } from 'twenty-ui/theme-constants';
 
 import {
-  DIALER_PANEL_FRONT_COMPONENT_ID,
   ROUTE_CALL_CHECK,
+  ROUTE_MY_CALL,
   ROUTE_CALL_STATUS,
   ROUTE_HANG_UP,
   ROUTE_SAVE_OUTCOME,
   ROUTE_START_CALL,
 } from 'src/constants/universal-identifiers';
+import { DncAlert } from 'src/components/dnc-alert';
 import { CALL_OUTCOMES, type CallOutcomeValue } from 'src/shared/outcomes';
 
 type Stage =
@@ -39,12 +43,18 @@ type SaveResponse =
   | { ok: true; recordId: string; companyMarkedDnc: boolean; warning: string | null }
   | { ok: false; message: string };
 type CheckResponse =
-  | { ok: true; doNotCall: boolean; reason: string | null; companyName: string | null }
+  | {
+      ok: true;
+      doNotCall: boolean;
+      scope: 'company' | 'person' | null;
+      reason: string | null;
+      companyName: string | null;
+    }
   | { ok: false; message: string };
 type DncState =
   | { status: 'checking' }
   | { status: 'ok'; companyName: string | null }
-  | { status: 'blocked'; reason: string };
+  | { status: 'blocked'; reason: string; scope: 'company' | 'person' };
 
 const DNC_VALUE = 'DNC';
 
@@ -56,7 +66,26 @@ const todayInBrowser = () => {
 };
 type SaveState = 'idle' | 'saving' | 'saved';
 
-type StartResponse = { ok: true; callSid: string } | { ok: false; message: string };
+type StartResponse =
+  | { ok: true; callSid: string }
+  | { ok: false; message: string; needsOutcome?: boolean };
+type MyCallResponse =
+  | {
+      ok: true;
+      call: null | {
+        callSid: string;
+        personId: string;
+        personName: string;
+        personFirstName: string;
+        stage: Exclude<Stage, 'idle'>;
+        endReason: string | null;
+        durationSeconds: number | null;
+        needsOutcome: boolean;
+        isActive: boolean;
+      };
+    }
+  | { ok: false; message: string };
+type CallPerson = { id: string; name: string; firstName: string };
 type StatusResponse =
   | {
       ok: true;
@@ -68,6 +97,7 @@ type StatusResponse =
 
 const ACTIVE_STAGES: Stage[] = ['starting', 'rep-ringing', 'prospect-ringing', 'connected'];
 const POLL_MS = 2000;
+const DNC_RECHECK_MS = 15000;
 
 const formatDuration = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -163,6 +193,7 @@ const OutcomePicker = ({ selected, isLocked, onSelect }: OutcomePickerProps) => 
 type ActionButtonProps = {
   label: string;
   tone: 'call' | 'hang-up' | 'save' | 'dnc';
+  size?: 'regular' | 'large';
   icon: ReactNode;
   isBusy: boolean;
   isDisabled?: boolean;
@@ -170,7 +201,15 @@ type ActionButtonProps = {
 };
 
 // A plain button styled with Twenty's own colors.
-const ActionButton = ({ label, tone, icon, isBusy, isDisabled, onClick }: ActionButtonProps) => {
+const ActionButton = ({
+  label,
+  tone,
+  size = 'regular',
+  icon,
+  isBusy,
+  isDisabled,
+  onClick,
+}: ActionButtonProps) => {
   const theme = useTheme();
   const disabled = isBusy || Boolean(isDisabled);
   return (
@@ -185,14 +224,19 @@ const ActionButton = ({ label, tone, icon, isBusy, isDisabled, onClick }: Action
         justifyContent: 'center',
         gap: theme.spacing[2],
         width: '100%',
-        height: '40px',
+        height: size === 'large' ? '56px' : '40px',
         border: 'none',
         borderRadius: theme.border.radius.md,
-        background: tone === 'hang-up' || tone === 'dnc' ? theme.color.red : theme.color.blue,
+        background:
+          tone === 'call'
+            ? theme.color.orange
+            : tone === 'hang-up' || tone === 'dnc'
+              ? theme.color.red
+              : theme.color.blue,
         color: '#FFFFFF',
         fontFamily: theme.font.family,
-        fontSize: theme.font.size.md,
-        fontWeight: theme.font.weight.medium,
+        fontSize: size === 'large' ? theme.font.size.lg : theme.font.size.md,
+        fontWeight: size === 'large' ? theme.font.weight.semiBold : theme.font.weight.medium,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.55 : 1,
       }}
@@ -203,10 +247,13 @@ const ActionButton = ({ label, tone, icon, isBusy, isDisabled, onClick }: Action
   );
 };
 
-const DialerPanel = () => {
+// The whole dialer, shown as the "Call" box at the top of each person's page.
+export const Dialer = () => {
   const theme = useTheme();
+  const recordId = useRecordId();
   const selectedRecordIds = useSelectedRecordIds();
-  const personId = selectedRecordIds.length === 1 ? selectedRecordIds[0] : null;
+  const personId =
+    recordId ?? (selectedRecordIds.length === 1 ? selectedRecordIds[0] : null);
 
   const [person, setPerson] = useState<Person | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -222,43 +269,63 @@ const DialerPanel = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
   const [dnc, setDnc] = useState<DncState>({ status: 'checking' });
+  // Who the current (or waiting-for-outcome) call is with. Usually the person
+  // on screen, but can be someone else if the rep left a call unfinished.
+  const [callPerson, setCallPerson] = useState<CallPerson | null>(null);
   const connectedAtRef = useRef<number | null>(null);
+  // Calls started from this box pop up the "pick an outcome" window when they end.
+  const startedHereRef = useRef<string | null>(null);
+  const poppedUpForRef = useRef<string | null>(null);
 
   const firstName = person?.name?.firstName?.trim() || 'this person';
   const fullName =
     [person?.name?.firstName, person?.name?.lastName].filter(Boolean).join(' ') ||
     'Unnamed person';
+  const isOtherPersonsCall = Boolean(callPerson && callPerson.id !== personId);
+  const callFirstName = isOtherPersonsCall ? callPerson!.firstName : firstName;
   const phoneDisplay = person?.phones?.primaryPhoneNumber
     ? `${person.phones.primaryPhoneCallingCode ?? ''} ${person.phones.primaryPhoneNumber}`.trim()
     : null;
 
-  // Check Do Not Call before showing the Call button.
+  // Check Do Not Call before showing the Call button, and keep re-checking so a
+  // company marked DNC by someone else locks this screen within seconds.
   useEffect(() => {
     if (!personId) {
       return;
     }
     let cancelled = false;
     setDnc({ status: 'checking' });
-    new RestApiClient()
-      .get<CheckResponse>(`/s${ROUTE_CALL_CHECK}`, { query: { personId } })
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-        if (result.ok && result.doNotCall) {
-          setDnc({ status: 'blocked', reason: result.reason ?? 'This lead is marked Do Not Call.' });
-        } else {
-          setDnc({ status: 'ok', companyName: result.ok ? result.companyName : null });
-        }
-      })
-      .catch(() => {
-        // If the check can't run, the server still refuses DNC calls at dial time.
-        if (!cancelled) {
-          setDnc({ status: 'ok', companyName: null });
-        }
-      });
+    const check = (isFirstCheck: boolean) =>
+      new RestApiClient()
+        .get<CheckResponse>(`/s${ROUTE_CALL_CHECK}`, { query: { personId } })
+        .then((result) => {
+          if (cancelled || !result.ok) {
+            if (!cancelled && isFirstCheck) {
+              setDnc({ status: 'ok', companyName: null });
+            }
+            return;
+          }
+          if (result.doNotCall) {
+            setDnc({
+              status: 'blocked',
+              reason: result.reason ?? 'This lead is marked Do Not Call.',
+              scope: result.scope ?? 'company',
+            });
+          } else {
+            setDnc({ status: 'ok', companyName: result.companyName });
+          }
+        })
+        .catch(() => {
+          // If the check can't run, the server still refuses DNC calls at dial time.
+          if (!cancelled && isFirstCheck) {
+            setDnc({ status: 'ok', companyName: null });
+          }
+        });
+    void check(true);
+    const timer = setInterval(() => void check(false), DNC_RECHECK_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [personId]);
 
@@ -304,7 +371,7 @@ const DialerPanel = () => {
         }
         if (status.stage === 'ended') {
           setEndReason(status.endReason);
-          setMessage(endedMessage(status.endReason, firstName));
+          setMessage(endedMessage(status.endReason, callFirstName));
           if (status.durationSeconds) {
             setTalkSeconds(status.durationSeconds);
           }
@@ -315,7 +382,7 @@ const DialerPanel = () => {
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [callSid, stage, firstName]);
+  }, [callSid, stage, callFirstName]);
 
   // Talk-time counter.
   useEffect(() => {
@@ -330,6 +397,42 @@ const DialerPanel = () => {
     return () => clearInterval(timer);
   }, [stage]);
 
+  // Resume this rep's call in progress, or bring back a finished call that
+  // still needs an outcome (even if it was with someone else).
+  const loadMyCall = useCallback(async () => {
+    try {
+      const result = await new RestApiClient().get<MyCallResponse>(`/s${ROUTE_MY_CALL}`);
+      if (!result.ok || !result.call) {
+        return;
+      }
+      const call = result.call;
+      setCallPerson({ id: call.personId, name: call.personName, firstName: call.personFirstName });
+      setCallSid(call.callSid);
+      setOutcome(null);
+      setNotes('');
+      setSaveState('idle');
+      setSaveError(null);
+      setSaveWarning(null);
+      if (call.needsOutcome) {
+        setStage('ended');
+        setEndReason(call.endReason ?? 'completed');
+        setMessage(endedMessage(call.endReason, call.personFirstName));
+        setTalkSeconds(call.durationSeconds ?? 0);
+      } else {
+        setStage(call.stage);
+        if (call.stage === 'connected') {
+          connectedAtRef.current = Date.now();
+        }
+      }
+    } catch {
+      // Not fatal: the server still enforces one call at a time.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMyCall();
+  }, [loadMyCall]);
+
   const startCall = useCallback(async () => {
     if (!personId) {
       return;
@@ -343,6 +446,7 @@ const DialerPanel = () => {
     setSaveState('idle');
     setSaveError(null);
     setSaveWarning(null);
+    setCallPerson(null);
     connectedAtRef.current = null;
     try {
       const result = await new RestApiClient().post<StartResponse>(
@@ -350,8 +454,11 @@ const DialerPanel = () => {
         { personId },
       );
       if (result.ok) {
+        startedHereRef.current = result.callSid;
         setCallSid(result.callSid);
         setStage('starting');
+      } else if (result.needsOutcome) {
+        await loadMyCall();
       } else {
         setStage('failed');
         setMessage(result.message);
@@ -362,7 +469,7 @@ const DialerPanel = () => {
     } finally {
       setIsBusy(false);
     }
-  }, [personId]);
+  }, [personId, loadMyCall]);
 
   const hangUp = useCallback(async () => {
     if (!callSid) {
@@ -373,13 +480,13 @@ const DialerPanel = () => {
       await new RestApiClient().post(`/s${ROUTE_HANG_UP}`, { callSid });
       setStage('ended');
       setEndReason('hung-up');
-      setMessage(endedMessage('hung-up', firstName));
+      setMessage(endedMessage('hung-up', callFirstName));
     } catch {
       setMessage('Could not hang up from here. Hang up on your phone instead.');
     } finally {
       setIsBusy(false);
     }
-  }, [callSid, firstName]);
+  }, [callSid, callFirstName]);
 
   const saveOutcome = useCallback(async () => {
     if (!callSid || !outcome) {
@@ -393,11 +500,23 @@ const DialerPanel = () => {
         { callSid, outcome, notes, localDate: todayInBrowser() },
       );
       if (result.ok) {
+        if (isOtherPersonsCall && outcome !== DNC_VALUE && !result.warning) {
+          // That was a leftover call with someone else; now ready for this person.
+          setCallPerson(null);
+          setCallSid(null);
+          setStage('idle');
+          setMessage(null);
+          setOutcome(null);
+          setNotes('');
+          setSaveState('idle');
+          return;
+        }
         setSaveState('saved');
         setSaveWarning(result.warning);
-        if (outcome === DNC_VALUE) {
+        if (outcome === DNC_VALUE && !isOtherPersonsCall) {
           setDnc({
             status: 'blocked',
+            scope: result.companyMarkedDnc ? 'company' : 'person',
             reason: result.companyMarkedDnc
               ? 'You marked this company Do Not Call. Nobody there can be called from the dialer again.'
               : 'You marked this person Do Not Call. They can no longer be called from the dialer.',
@@ -411,7 +530,7 @@ const DialerPanel = () => {
       setSaveState('idle');
       setSaveError('Could not reach the dialer to save. Try again.');
     }
-  }, [callSid, outcome, notes]);
+  }, [callSid, outcome, notes, isOtherPersonsCall]);
 
   const styles = {
     root: {
@@ -460,11 +579,48 @@ const DialerPanel = () => {
       fontWeight: theme.font.weight.semiBold,
       fontVariantNumeric: 'tabular-nums' as const,
     },
+    recording: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing[2],
+      margin: 0,
+      fontSize: theme.font.size.sm,
+      fontWeight: theme.font.weight.medium,
+      color: theme.color.red,
+    },
+    recordingDot: {
+      display: 'inline-block',
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      background: theme.color.red,
+    },
     hint: {
       margin: 0,
       fontSize: theme.font.size.sm,
       color: theme.font.color.tertiary,
       lineHeight: 1.5,
+    },
+    outcomeCard: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: theme.spacing[4],
+      padding: theme.spacing[4],
+      borderRadius: theme.border.radius.md,
+      border: `2px solid ${theme.color.orange}`,
+      background: theme.background.primary,
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
+    },
+    outcomeDone: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: theme.spacing[4],
+    },
+    outcomeTitle: {
+      margin: 0,
+      fontSize: theme.font.size.lg,
+      fontWeight: theme.font.weight.semiBold,
+      color: theme.font.color.primary,
     },
     dncBanner: {
       display: 'flex',
@@ -522,6 +678,38 @@ const DialerPanel = () => {
     },
   };
 
+  const isActive = ACTIVE_STAGES.includes(stage);
+  // Only ask for an outcome if the rep actually picked up their phone.
+  const canLogOutcome =
+    stage === 'ended' && Boolean(callSid) && !(endReason ?? '').startsWith('rep-');
+  // An outcome is required before anything else can happen.
+  const outcomeRequired = canLogOutcome && saveState !== 'saved';
+  const isDncBlocked = dnc.status === 'blocked' && !isOtherPersonsCall;
+  const isDncPicked = outcome === DNC_VALUE;
+  const isDncSaved = isDncPicked && saveState === 'saved';
+  const dncTarget = isOtherPersonsCall
+    ? null
+    : (dnc.status === 'ok' && dnc.companyName) || person?.company?.name || null;
+
+  // When a call started from this box ends, pop up a Twenty window asking for
+  // the outcome. (If pop-ups aren't available here, the locked outcome step
+  // below still has to be completed.)
+  useEffect(() => {
+    if (!outcomeRequired || !callSid) {
+      return;
+    }
+    if (startedHereRef.current !== callSid || poppedUpForRef.current === callSid) {
+      return;
+    }
+    poppedUpForRef.current = callSid;
+    openCommandConfirmationModal({
+      title: 'How did the call go?',
+      subtitle: `Pick an outcome for your call with ${callFirstName}. You can't start another call until you do.`,
+      confirmButtonText: 'Pick outcome',
+      confirmButtonAccent: 'blue',
+    }).catch(() => undefined);
+  }, [outcomeRequired, callSid, callFirstName]);
+
   if (!personId) {
     return (
       <div style={styles.root}>
@@ -538,18 +726,12 @@ const DialerPanel = () => {
     );
   }
 
-  const isActive = ACTIVE_STAGES.includes(stage);
-  // Only ask for an outcome if the rep actually picked up their phone.
-  const canLogOutcome =
-    stage === 'ended' && Boolean(callSid) && !(endReason ?? '').startsWith('rep-');
-  const isDncBlocked = dnc.status === 'blocked';
-  const isDncPicked = outcome === DNC_VALUE;
-  const isDncSaved = isDncPicked && saveState === 'saved';
-  const dncTarget =
-    (dnc.status === 'ok' && dnc.companyName) || person?.company?.name || null;
 
   return (
     <div style={styles.root}>
+      {isDncBlocked && dnc.status === 'blocked' && (
+        <DncAlert message={dnc.reason} scope={dnc.scope} />
+      )}
       <div>
         <p style={styles.name}>{person ? fullName : 'Loading…'}</p>
         {(person?.jobTitle || person?.company?.name) && (
@@ -560,29 +742,27 @@ const DialerPanel = () => {
         <p style={styles.number}>{person ? phoneDisplay ?? 'No phone number' : ''}</p>
       </div>
 
-      {isDncBlocked && (
-        <div style={styles.dncBanner} role="alert">
-          <p style={styles.dncTitle}>Do Not Call</p>
-          <p style={styles.dncText}>{dnc.reason}</p>
-        </div>
-      )}
 
       {isActive && (
         <div style={styles.statusBox} aria-live="polite">
           {stage === 'connected' ? (
             <>
-              <p style={styles.statusLine}>Talking with {firstName}</p>
+              <p style={styles.statusLine}>Talking with {callFirstName}</p>
               <p style={styles.timer}>{formatDuration(talkSeconds)}</p>
+              <p style={styles.recording}>
+                <span aria-hidden="true" style={styles.recordingDot} />
+                Recording
+              </p>
             </>
           ) : (
             <>
               <p style={styles.statusLine}>
-                {stage === 'prospect-ringing' ? `Calling ${firstName}…` : 'Ringing your phone…'}
+                {stage === 'prospect-ringing' ? `Calling ${callFirstName}…` : 'Ringing your phone…'}
               </p>
               <p style={styles.hint}>
                 {stage === 'prospect-ringing'
                   ? 'Stay on the line. You’ll hear it ring.'
-                  : `Pick up your phone and we’ll dial ${firstName}.`}
+                  : `Pick up your phone and we’ll dial ${callFirstName}.`}
               </p>
             </>
           )}
@@ -593,13 +773,26 @@ const DialerPanel = () => {
         <div style={styles.statusBox} aria-live="polite">
           <p style={styles.statusLine}>{message ?? 'Call ended.'}</p>
           {talkSeconds > 0 && (
-            <p style={styles.hint}>You talked for {formatDuration(talkSeconds)}.</p>
+            <p style={styles.hint}>
+              You talked for {formatDuration(talkSeconds)}. The recording shows up in
+              Recorded Calls within a minute or two.
+            </p>
           )}
         </div>
       )}
 
       {canLogOutcome && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
+        <div
+          style={outcomeRequired ? styles.outcomeCard : styles.outcomeDone}
+          role={outcomeRequired ? 'dialog' : undefined}
+          aria-label="Call outcome"
+        >
+          {outcomeRequired && (
+            <div>
+              <p style={styles.outcomeTitle}>Pick an outcome for your call with {callFirstName}</p>
+              <p style={styles.hint}>Required before your next call.</p>
+            </div>
+          )}
           <div>
             <p style={styles.fieldLabel}>How did it go?</p>
             <OutcomePicker
@@ -633,17 +826,17 @@ const DialerPanel = () => {
           </div>
           {isDncPicked && !isDncSaved && (
             <div style={styles.dncBanner} role="alert">
-              <p style={styles.dncTitle}>This will mark {dncTarget ?? firstName} Do Not Call</p>
+              <p style={styles.dncTitle}>This will mark {dncTarget ?? callFirstName} Do Not Call</p>
               <p style={styles.dncText}>
                 {dncTarget
                   ? `Its Lead Status becomes DNC and nobody at ${dncTarget} can be called from the dialer again, by anyone on the team.`
-                  : `${firstName} can't be called from the dialer again, by anyone on the team.`}
+                  : `${callFirstName} (and their company, if they have one) can't be called from the dialer again, by anyone on the team.`}
               </p>
             </div>
           )}
           {saveState === 'saved' ? (
             <p style={styles.saved} aria-live="polite">
-              Saved to {firstName}'s Dialer Calls.
+              Saved to {callFirstName}'s Dialer Calls.
             </p>
           ) : (
             <ActionButton
@@ -677,9 +870,10 @@ const DialerPanel = () => {
             isBusy={isBusy}
             onClick={hangUp}
           />
-        ) : isDncBlocked ? null : (
+        ) : isDncBlocked || outcomeRequired ? null : (
           <ActionButton
             tone="call"
+            size="large"
             label={
               dnc.status === 'checking'
                 ? 'Checking Do Not Call…'
@@ -687,7 +881,7 @@ const DialerPanel = () => {
                   ? `Call ${firstName}`
                   : 'Call again'
             }
-            icon={<IconPhone size={16} />}
+            icon={<IconPhone size={22} />}
             isBusy={isBusy}
             isDisabled={!person || !phoneDisplay || dnc.status === 'checking'}
             onClick={startCall}
@@ -703,10 +897,3 @@ const DialerPanel = () => {
     </div>
   );
 };
-
-export default defineFrontComponent({
-  universalIdentifier: DIALER_PANEL_FRONT_COMPONENT_ID,
-  name: 'dialer-panel',
-  description: 'Call the selected person from Twenty.',
-  component: DialerPanel,
-});

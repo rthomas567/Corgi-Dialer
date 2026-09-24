@@ -1,30 +1,24 @@
+import {
+  type CompanyRecord,
+  DNC_LEAD_STATUS,
+  DNC_OUTCOME,
+  isCompanyDoNotCall,
+} from 'src/shared/dnc-rules';
 import { getRecord, listRecords } from 'src/shared/twenty-api';
 
-// A company is "Do Not Call" when its DNC switch is on OR its Lead Status is DNC.
-// A person with no company is Do Not Call if any of their past dialer calls
-// was saved with the DNC outcome.
-export const DNC_LEAD_STATUS = 'DNC';
-export const DNC_OUTCOME = 'DNC';
-
-export type CompanyRecord = {
-  id: string;
-  name?: string | null;
-  dnc?: unknown;
-  leadStatus?: string | null;
-  lastContacted?: string | null;
-};
+// Same rules as src/shared/dnc-rules.ts, plus: a person with no company is
+// Do Not Call if any of their past dialer calls was saved with the DNC outcome.
+export { DNC_LEAD_STATUS, DNC_OUTCOME, isCompanyDoNotCall, type CompanyRecord };
 
 type PersonRecord = { id: string; companyId?: string | null };
 type DialerCallRecord = { id: string; outcome?: string | null };
 
 export type DoNotCallStatus = {
   doNotCall: boolean;
+  scope: 'company' | 'person' | null;
   reason: string | null;
   companyName: string | null;
 };
-
-export const isCompanyDoNotCall = (company: CompanyRecord | null | undefined) =>
-  company?.dnc === true || company?.leadStatus === DNC_LEAD_STATUS;
 
 export const getDoNotCallStatus = async (personId: string): Promise<DoNotCallStatus> => {
   const person = await getRecord<PersonRecord>('people', personId);
@@ -36,6 +30,7 @@ export const getDoNotCallStatus = async (personId: string): Promise<DoNotCallSta
   if (isCompanyDoNotCall(company)) {
     return {
       doNotCall: true,
+      scope: 'company',
       reason: `${companyName ?? 'This company'} is marked Do Not Call. Nobody at this company can be called from the dialer.`,
       companyName,
     };
@@ -48,12 +43,13 @@ export const getDoNotCallStatus = async (personId: string): Promise<DoNotCallSta
   if (pastCalls.some((call) => call.outcome === DNC_OUTCOME)) {
     return {
       doNotCall: true,
+      scope: 'person',
       reason: 'This person asked not to be called. A past call was saved as DNC.',
       companyName,
     };
   }
 
-  return { doNotCall: false, reason: null, companyName };
+  return { doNotCall: false, scope: null, reason: null, companyName };
 };
 
 // Local calendar date from the rep's browser, e.g. "2026-09-24".

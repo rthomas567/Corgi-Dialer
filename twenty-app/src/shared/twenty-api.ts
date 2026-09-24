@@ -26,8 +26,9 @@ export const updateRecord = async <T>(
   objectNamePlural: string,
   id: string,
   data: Record<string, unknown>,
+  runAs: RunAs = 'user',
 ): Promise<T | null> => {
-  const response = await new RestApiClient({ runAs: 'user' }).patch(`/rest/${objectNamePlural}/${id}`, data);
+  const response = await new RestApiClient({ runAs }).patch(`/rest/${objectNamePlural}/${id}`, data);
   return unwrapRecord<T>(response);
 };
 
