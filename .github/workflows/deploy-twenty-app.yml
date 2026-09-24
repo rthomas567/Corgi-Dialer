@@ -1,0 +1,73 @@
+# Installs the dialer app into Twenty (corgi-smb.twenty.com) every time
+# changes to twenty-app/ are pushed to main. Runs on GitHub's Linux servers,
+# which avoids the Windows "Resource path must not contain backslashes" bug
+# in Twenty's install tool.
+#
+# One-time setup: add a repository secret named TWENTY_API_KEY
+# (GitHub repo > Settings > Secrets and variables > Actions).
+#
+# You can also run it by hand: GitHub repo > Actions > Deploy dialer to Twenty > Run workflow.
+
+name: Deploy dialer to Twenty
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'twenty-app/**'
+      - '.github/workflows/deploy-twenty-app.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-twenty-app
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: twenty-app
+    env:
+      TWENTY_URL: https://corgi-smb.twenty.com
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Turn on Yarn
+        run: corepack enable
+
+      - name: Install the app's parts
+        run: yarn install
+
+      - name: Safety checks (types and tests must pass before anything is installed)
+        run: |
+          yarn typecheck
+          yarn test:unit
+
+      - name: Check the API key secret exists
+        env:
+          TWENTY_API_KEY: ${{ secrets.TWENTY_API_KEY }}
+        run: |
+          if [ -z "$TWENTY_API_KEY" ]; then
+            echo "::error::Missing TWENTY_API_KEY secret. Add it in GitHub > Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Connect to Twenty
+        env:
+          TWENTY_API_KEY: ${{ secrets.TWENTY_API_KEY }}
+        run: yarn twenty remote:add --url "$TWENTY_URL" --api-key "$TWENTY_API_KEY"
+
+      - name: Install into Twenty
+        # Without --force, anything that would DELETE data stops here instead
+        # of running unattended.
+        run: yarn twenty apply

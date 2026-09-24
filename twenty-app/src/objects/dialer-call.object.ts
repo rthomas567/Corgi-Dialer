@@ -1,0 +1,122 @@
+import {
+  defineObject,
+  FieldType,
+  OnDeleteAction,
+  RelationType,
+  STANDARD_OBJECT,
+} from 'twenty-sdk/define';
+
+import {
+  COMPANY_DIALER_CALLS_FIELD_ID,
+  DIALER_CALL_CALLED_AT_FIELD_ID,
+  DIALER_CALL_COMPANY_FIELD_ID,
+  DIALER_CALL_DURATION_FIELD_ID,
+  DIALER_CALL_NAME_FIELD_ID,
+  DIALER_CALL_NOTES_FIELD_ID,
+  DIALER_CALL_OBJECT_ID,
+  DIALER_CALL_OUTCOME_FIELD_ID,
+  DIALER_CALL_PERSON_FIELD_ID,
+  DIALER_CALL_PHONE_FIELD_ID,
+  DIALER_CALL_SID_FIELD_ID,
+  PERSON_DIALER_CALLS_FIELD_ID,
+} from 'src/constants/universal-identifiers';
+import { CALL_OUTCOMES } from 'src/shared/outcomes';
+
+// One record per call made from the dialer. "Created by" shows which rep made it.
+export default defineObject({
+  universalIdentifier: DIALER_CALL_OBJECT_ID,
+  nameSingular: 'dialerCall',
+  namePlural: 'dialerCalls',
+  labelSingular: 'Dialer Call',
+  labelPlural: 'Dialer Calls',
+  description: 'Calls made from the Corgi Dialer, with their outcome.',
+  icon: 'IconPhone',
+  labelIdentifierFieldMetadataUniversalIdentifier: DIALER_CALL_NAME_FIELD_ID,
+  fields: [
+    {
+      universalIdentifier: DIALER_CALL_NAME_FIELD_ID,
+      type: FieldType.TEXT,
+      name: 'name',
+      label: 'Name',
+      icon: 'IconPhone',
+    },
+    {
+      universalIdentifier: DIALER_CALL_OUTCOME_FIELD_ID,
+      type: FieldType.SELECT,
+      name: 'outcome',
+      label: 'Outcome',
+      icon: 'IconTag',
+      options: CALL_OUTCOMES.map((outcome, position) => ({
+        value: outcome.value,
+        label: outcome.label,
+        color: outcome.color,
+        position,
+      })),
+    },
+    {
+      universalIdentifier: DIALER_CALL_NOTES_FIELD_ID,
+      type: FieldType.TEXT,
+      name: 'notes',
+      label: 'Notes',
+      icon: 'IconNotes',
+    },
+    {
+      universalIdentifier: DIALER_CALL_DURATION_FIELD_ID,
+      type: FieldType.NUMBER,
+      name: 'durationSeconds',
+      label: 'Talk time (seconds)',
+      icon: 'IconClock',
+    },
+    {
+      universalIdentifier: DIALER_CALL_PHONE_FIELD_ID,
+      type: FieldType.TEXT,
+      name: 'phoneNumber',
+      label: 'Number dialed',
+      icon: 'IconPhone',
+    },
+    {
+      universalIdentifier: DIALER_CALL_CALLED_AT_FIELD_ID,
+      type: FieldType.DATE_TIME,
+      name: 'calledAt',
+      label: 'Called at',
+      icon: 'IconCalendarEvent',
+    },
+    {
+      universalIdentifier: DIALER_CALL_SID_FIELD_ID,
+      type: FieldType.TEXT,
+      name: 'signalWireCallId',
+      label: 'SignalWire call ID',
+      icon: 'IconId',
+    },
+    {
+      universalIdentifier: DIALER_CALL_PERSON_FIELD_ID,
+      type: FieldType.RELATION,
+      name: 'person',
+      label: 'Person',
+      icon: 'IconUser',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier: STANDARD_OBJECT.person.universalIdentifier,
+      relationTargetFieldMetadataUniversalIdentifier: PERSON_DIALER_CALLS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'personId',
+      },
+    },
+    {
+      universalIdentifier: DIALER_CALL_COMPANY_FIELD_ID,
+      type: FieldType.RELATION,
+      name: 'company',
+      label: 'Company',
+      icon: 'IconBuildingSkyscraper',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier: STANDARD_OBJECT.company.universalIdentifier,
+      relationTargetFieldMetadataUniversalIdentifier: COMPANY_DIALER_CALLS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'companyId',
+      },
+    },
+  ],
+});
