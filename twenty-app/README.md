@@ -62,6 +62,37 @@ the day of the call (it never moves backwards).
 - To undo: turn off the company's DNC switch **and** change its Lead Status.
   For a person with no company, change the outcome on their DNC Dialer Call.
 
+## Atlas → Opportunities sync
+
+Replaces the old Broker Submissions sync. Atlas sends its webhooks to
+`https://corgi-smb.twenty.com/s/atlas/webhook`, and each Atlas **quote** becomes
+one **Opportunity** (Pipeline = BROKERED, Lead Source = Broker), linked to the
+quote in Atlas.
+
+- `quote.status_changed` creates the Opportunity (first time) and moves its stage.
+- `quote.pricing_changed` updates **Amount**; the newest price revision wins.
+- `submission.coverage_changed` moves the stage and records the **Atlas Submission Number**.
+- `submission.status_changed` (version-2 webhooks) fills in the insured name, the
+  agency (**Company**, created if new) and the producer (**Person**, created if new).
+- `policy.issued` sets **BOUND** and the bound date.
+
+Stages: draft/pending/submitted → Submission Received; review/referred/needs
+review/processing → In Review; quoted → Quote Sent; bound/purchased → BOUND;
+declined → Closed Lost. Stages only move forward (BOUND is final), so a stage a
+rep sets by hand, like Negotiating, isn't undone by a late Atlas message.
+
+Safety: every message's signature is checked (HMAC-SHA256, 5-minute window);
+repeated deliveries are ignored; sandbox messages are skipped unless
+**Atlas environment** is set to `test`. The last 10 messages are kept and can be
+read (signed-in) at `GET /s/atlas/samples`.
+
+Settings (Settings → Apps → Corgi Dialer): **Atlas webhook signing secret**
+(required), **Atlas API key** (optional lookups), **Atlas environment**.
+
+Atlas doesn't publish the field names inside the version-2 `detail` block, so
+the insured/agency/producer reader (`src/atlas/detail.ts`) looks for the likely
+names; check the first real Opportunities and tighten it if anything is blank.
+
 ## How it works
 
 ```
@@ -93,6 +124,7 @@ recording-ready◄ SignalWire: "the recording is ready" → adds it to the recor
 | `src/fields/` | The "Dialer Calls" lists on person and company pages |
 | `src/shared/outcomes.ts` | The ten outcomes (edit here to change them) |
 | `src/shared/dnc.ts` | The Do Not Call rules |
+| `src/atlas/` | The Atlas → Opportunities sync (signature check, mapping, storage) |
 | `src/views/`, `src/navigation-menu-items/` | The Recorded Calls list and its sidebar entry |
 | `src/logic-functions/` | The five server-side steps above |
 | `src/shared/` | Helpers: phone formatting, SignalWire, settings |

@@ -89,3 +89,13 @@ export const PERSON_CALL_BOX_FRONT_COMPONENT_ID = 'e8f2c20f-cb16-496c-92c3-105cf
 // Version 6: big Do Not Call warnings (person page + company page)
 export const COMPANY_DNC_BOX_FRONT_COMPONENT_ID = '5a27ab98-e569-43fb-aca8-bd2c670e0b83';
 export const COMPANY_DNC_WIDGET_ID = '64d2b695-3ff1-4a7f-8fc6-d6106f68ca27';
+
+// Version 8: Atlas -> Opportunities sync (replaces Broker Submissions)
+export const ATLAS_WEBHOOK_FUNCTION_ID = 'b013077b-febf-42e2-b724-f5efb4d1bec8';
+export const ATLAS_SAMPLES_FUNCTION_ID = '68fd5a97-7d64-4944-9f92-b9256cbce94c';
+export const ROUTE_ATLAS_WEBHOOK = '/atlas/webhook';
+export const ROUTE_ATLAS_SAMPLES = '/atlas/samples';
+export const OPPORTUNITY_ATLAS_SUBMISSION_FIELD_ID = '74ae412a-5737-41d5-9130-b50db1fa6822';
+export const VAR_ATLAS_WEBHOOK_SECRET_ID = '0d3058ed-af35-4035-bf68-8c5037cb7168';
+export const VAR_ATLAS_API_KEY_ID = 'f03a8fd6-6eb5-4275-b176-ec18a816592d';
+export const VAR_ATLAS_ENVIRONMENT_ID = '56c699c1-b6c5-4db8-8b1b-2ca3d33c2e03';
