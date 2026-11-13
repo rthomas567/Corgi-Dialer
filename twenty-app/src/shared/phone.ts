@@ -26,3 +26,14 @@ export const toDialableNumber = (phones: TwentyPhones): string | null => {
 
 export const isDialableNumber = (value: unknown): value is string =>
   typeof value === 'string' && /^\+\d{8,15}$/.test(value);
+
+// The first usable number out of several phone fields, in order of preference.
+export const firstDialableNumber = (...fields: TwentyPhones[]): string | null => {
+  for (const field of fields) {
+    const number = toDialableNumber(field);
+    if (number) {
+      return number;
+    }
+  }
+  return null;
+};

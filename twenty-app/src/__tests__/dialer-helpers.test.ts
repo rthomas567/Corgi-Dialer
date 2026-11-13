@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { escapeXml } from 'src/shared/laml';
+import { escapeXml } from 'src/shared/twiml';
 import { isDialableNumber, toDialableNumber } from 'src/shared/phone';
 import { readFormBody } from 'src/shared/route-body';
-import { readRepSettings, readSignalWireSettings } from 'src/shared/settings';
+import { readRepSettings, readTwilioSettings } from 'src/shared/settings';
 
 describe('toDialableNumber', () => {
   it('adds the calling code to a local number', () => {
@@ -53,16 +53,20 @@ describe('readRepSettings', () => {
   });
 });
 
-describe('readSignalWireSettings', () => {
-  it('cleans up a pasted space URL', () => {
+describe('readTwilioSettings', () => {
+  it('builds the SignalWire address from a pasted space URL', () => {
     process.env.SIGNALWIRE_SPACE_URL = 'https://corgi-atlas.signalwire.com/';
-    process.env.SIGNALWIRE_PROJECT_ID = 'project';
-    process.env.SIGNALWIRE_API_TOKEN = 'token';
-    expect(readSignalWireSettings()?.spaceUrl).toBe('corgi-atlas.signalwire.com');
+    process.env.SIGNALWIRE_PROJECT_ID = ' project ';
+    process.env.SIGNALWIRE_API_TOKEN = 'token\n';
+    expect(readTwilioSettings()).toEqual({
+      accountSid: 'project',
+      authToken: 'token',
+      apiBase: 'https://corgi-atlas.signalwire.com/api/laml/2010-04-01/Accounts/project',
+    });
   });
   it('returns null when anything is missing', () => {
     process.env.SIGNALWIRE_API_TOKEN = '';
-    expect(readSignalWireSettings()).toBeNull();
+    expect(readTwilioSettings()).toBeNull();
   });
 });
 

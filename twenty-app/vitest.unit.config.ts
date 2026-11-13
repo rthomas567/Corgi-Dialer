@@ -10,5 +10,6 @@ export default defineConfig({
   ],
   test: {
     include: ['src/**/*.test.ts'],
+    setupFiles: ['src/__tests__/setup-kv.ts'],
   },
 });

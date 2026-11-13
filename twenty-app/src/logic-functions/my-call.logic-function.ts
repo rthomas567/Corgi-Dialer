@@ -25,9 +25,12 @@ const handler = async (_event: RoutePayload, context: LogicFunctionExecutionCont
     return { ok: true as const, call: null };
   }
 
-  const person = await getRecord<Person>('people', call.personId).catch(() => null);
+  const person = call.personId
+    ? await getRecord<Person>('people', call.personId).catch(() => null)
+    : null;
   const personName =
     [person?.name?.firstName, person?.name?.lastName].filter(Boolean).join(' ') ||
+    call.displayName ||
     'this person';
 
   return {
@@ -37,6 +40,7 @@ const handler = async (_event: RoutePayload, context: LogicFunctionExecutionCont
       personId: call.personId,
       personName,
       personFirstName: person?.name?.firstName?.trim() || personName,
+      fromSession: Boolean(call.sessionId),
       stage: call.stage,
       endReason: call.endReason ?? null,
       durationSeconds: call.durationSeconds ?? null,

@@ -10,8 +10,8 @@ import {
 } from 'src/constants/universal-identifiers';
 import { getCall, updateCall } from 'src/shared/call-store';
 import { readJsonBody } from 'src/shared/route-body';
-import { readSignalWireSettings } from 'src/shared/settings';
-import { endCall } from 'src/shared/signalwire';
+import { readTwilioSettings } from 'src/shared/settings';
+import { endCall } from 'src/shared/twilio';
 import { syncCallResult } from 'src/shared/sync-record';
 
 const handler = async (
@@ -25,14 +25,14 @@ const handler = async (
     return { ok: false as const, message: 'Call not found.' };
   }
 
-  const signalWire = readSignalWireSettings();
-  if (!signalWire) {
+  const twilio = readTwilioSettings();
+  if (!twilio) {
     return { ok: false as const, message: 'SignalWire is not set up.' };
   }
 
   if (call.stage !== 'ended') {
     try {
-      await endCall(signalWire, call.callSid);
+      await endCall(twilio, call.callSid);
     } catch (error) {
       return {
         ok: false as const,

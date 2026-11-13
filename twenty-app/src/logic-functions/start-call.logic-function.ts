@@ -18,16 +18,18 @@ import {
   setRepLatestCall,
 } from 'src/shared/call-store';
 import { getDoNotCallStatus } from 'src/shared/dnc';
-import { toDialableNumber, type TwentyPhones } from 'src/shared/phone';
+import { firstDialableNumber, type TwentyPhones } from 'src/shared/phone';
+import { getRepSessionId } from 'src/shared/session-store';
 import { readJsonBody } from 'src/shared/route-body';
-import { readRepSettings, readSignalWireSettings } from 'src/shared/settings';
-import { ringRepPhone } from 'src/shared/signalwire';
+import { readRepSettings, readTwilioSettings } from 'src/shared/settings';
+import { ringRepPhone } from 'src/shared/twilio';
 import { createRecord, functionsBaseUrl, getRecord } from 'src/shared/twenty-api';
 
 type Person = {
   id: string;
   name?: { firstName?: string; lastName?: string } | null;
   phones?: TwentyPhones;
+  mobilePhone?: TwentyPhones;
   companyId?: string | null;
 };
 type WorkspaceMember = {
@@ -59,14 +61,17 @@ const handler = async (
   if (isCallActive(latest)) {
     return fail("You're already on a call. Hang up that call first.");
   }
+  if (await getRepSessionId(workspaceMemberId)) {
+    return fail('You have a power dialer session running. Stop it before calling one person.');
+  }
 
   const { personId } = readJsonBody<{ personId: string }>(event);
   if (!personId) {
     return fail('No person was selected.');
   }
 
-  const signalWire = readSignalWireSettings();
-  if (!signalWire) {
+  const twilio = readTwilioSettings();
+  if (!twilio) {
     return fail('SignalWire is not set up yet. Ask an admin to fill in the SignalWire settings in Settings > Apps > Corgi Dialer.');
   }
 
@@ -85,13 +90,14 @@ const handler = async (
     return fail('Could not load this person.');
   }
 
+  const prospectNumber = firstDialableNumber(person.phones, person.mobilePhone);
+
   // Never dial anyone marked Do Not Call, even if the panel was already open.
-  const dncStatus = await getDoNotCallStatus(personId);
+  const dncStatus = await getDoNotCallStatus(personId, prospectNumber);
   if (dncStatus.doNotCall) {
     return fail(dncStatus.reason ?? 'This person is marked Do Not Call.');
   }
 
-  const prospectNumber = toDialableNumber(person.phones);
   if (!prospectNumber) {
     return fail('This person has no usable phone number.');
   }
@@ -100,7 +106,7 @@ const handler = async (
 
   let callSid: string;
   try {
-    callSid = await ringRepPhone(signalWire, {
+    callSid = await ringRepPhone(twilio, {
       repPhone: rep.ringTo,
       callerId: rep.callerId,
       bridgeUrl: `${baseUrl}${ROUTE_BRIDGE}`,

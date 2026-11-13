@@ -8,6 +8,9 @@ export const CALL_RESULTS = [
   { value: 'FAILED', label: 'Failed', color: 'red' },
   { value: 'REP_MISSED', label: 'Rep didn\'t pick up', color: 'yellow' },
   { value: 'CANCELED', label: 'Canceled', color: 'gray' },
+  // Power / parallel dialer
+  { value: 'VOICEMAIL', label: 'Voicemail (skipped)', color: 'purple' },
+  { value: 'DROPPED', label: 'Also picked up - call back', color: 'pink' },
 ] as const;
 
 export type CallResultValue = (typeof CALL_RESULTS)[number]['value'];

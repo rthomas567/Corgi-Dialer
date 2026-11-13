@@ -2,20 +2,20 @@ import { defineLogicFunction } from 'twenty-sdk/define';
 import { Response, type RoutePayload } from 'twenty-sdk/logic-function';
 
 import { ROUTE_WHISPER, WHISPER_FUNCTION_ID } from 'src/constants/universal-identifiers';
-import { escapeXml, lamlResponse } from 'src/shared/laml';
+import { escapeXml, twimlResponse } from 'src/shared/twiml';
 import { readFormBody } from 'src/shared/route-body';
-import { SIGNATURE_HEADERS } from 'src/shared/signalwire-signature';
-import { isFromSignalWire } from 'src/shared/verify-signalwire';
+import { SIGNATURE_HEADERS } from 'src/shared/twilio-signature';
+import { isFromTwilio } from 'src/shared/verify-twilio';
 
 // Plays the recording announcement to the person being called, right after
 // they pick up and before they are connected to the rep.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
-  if (!isFromSignalWire(event, ROUTE_WHISPER, form)) {
+  if (!isFromTwilio(event, ROUTE_WHISPER, form)) {
     return new Response('Not from SignalWire', { status: 403 });
   }
   const announcement = (process.env.RECORDING_ANNOUNCEMENT ?? '').trim();
-  return lamlResponse(announcement ? `<Say>${escapeXml(announcement)}</Say>` : '');
+  return twimlResponse(announcement ? `<Say>${escapeXml(announcement)}</Say>` : '');
 };
 
 export default defineLogicFunction({

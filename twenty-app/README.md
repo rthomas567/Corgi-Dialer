@@ -1,3 +1,7 @@
+> **SignalWire test version.** Same dialer as the Twilio version, but it runs on
+> SignalWire so it can be tested with the existing SignalWire account. Settings
+> already filled in for SignalWire are kept.
+
 # Corgi Dialer (Twenty app)
 
 Adds a **Call** box with a big orange **Call** button to the top of every
@@ -46,8 +50,11 @@ the day of the call (it never moves backwards).
 
 ### Do Not Call
 
-- A company is Do Not Call when its **DNC** switch is on **or** its **Lead
-  Status** is **DNC**. Nobody at that company can be called from the dialer:
+- A company is Do Not Call when **any** of these is set: the **DNC** switch,
+  **Do Not Call**, **YC Company Do Not Call**, **Lead Status = DNC**, or
+  **Call Disposition = Do not call (in progress)**. The same flags on a
+  person block that person. A phone number saved as DNC once is never dialed
+  again, whichever record it's on. Nobody at that company can be called from the dialer:
   the panel shows a red "Do Not Call" banner instead of the Call button, and
   the server refuses to dial even if the panel was already open.
 - Saving a call with the **DNC** outcome turns on the company's DNC switch
@@ -62,36 +69,32 @@ the day of the call (it never moves backwards).
 - To undo: turn off the company's DNC switch **and** change its Lead Status.
   For a person with no company, change the outcome on their DNC Dialer Call.
 
-## Atlas → Opportunities sync
+### Power and parallel dialing
 
-Replaces the old Broker Submissions sync. Atlas sends its webhooks to
-`https://corgi-smb.twenty.com/s/atlas/webhook`, and each Atlas **quote** becomes
-one **Opportunity** (Pipeline = BROKERED, Lead Source = Broker), linked to the
-quote in Atlas.
-
-- `quote.status_changed` creates the Opportunity (first time) and moves its stage.
-- `quote.pricing_changed` updates **Amount**; the newest price revision wins.
-- `submission.coverage_changed` moves the stage and records the **Atlas Submission Number**.
-- `submission.status_changed` (version-2 webhooks) fills in the insured name, the
-  agency (**Company**, created if new) and the producer (**Person**, created if new).
-- `policy.issued` sets **BOUND** and the bound date.
-
-Stages: draft/pending/submitted → Submission Received; review/referred/needs
-review/processing → In Review; quoted → Quote Sent; bound/purchased → BOUND;
-declined → Closed Lost. Stages only move forward (BOUND is final), so a stage a
-rep sets by hand, like Negotiating, isn't undone by a late Atlas message.
-
-Safety: every message's signature is checked (HMAC-SHA256, 5-minute window);
-repeated deliveries are ignored; sandbox messages are skipped unless
-**Atlas environment** is set to `test`. The last 10 messages are kept and can be
-read (signed-in) at `GET /s/atlas/samples`.
-
-Settings (Settings → Apps → Corgi Dialer): **Atlas webhook signing secret**
-(required), **Atlas API key** (optional lookups), **Atlas environment**.
-
-Atlas doesn't publish the field names inside the version-2 `detail` block, so
-the insured/agency/producer reader (`src/atlas/detail.ts`) looks for the likely
-names; check the first real Opportunities and tighten it if anything is blank.
+- **Start:** in People, Companies, or **Call Queue**, tick the records you want
+  to call (up to 500), then click **Start dialing**. Pick **Parallel** (2-5
+  lines at once) or **Power** (one at a time). Companies are called on their
+  main line (Phone, then Company Phone).
+- **Your phone rings first.** Pick up and **press 1**. (Pressing 1 means your
+  own voicemail can never start a session.) You then wait on an open line.
+- **Parallel:** the dialer calls several people at once. The first real person
+  to pick up is connected to you, and the other lines are hung up. If someone
+  else picks up at the same moment, they're hung up on (no message) and a
+  yellow **"also picked up - call them back"** notice appears with their number.
+  Lines hung up before anyone answered go back on the list once.
+- **Voicemails** are detected by SignalWire, hung up, and logged as Voicemail. You
+  never hear them.
+- **Outcome:** after each conversation, pick an outcome. Dialing continues
+  only once it's saved.
+- **Do Not Call:** every entry is checked right before it's dialed. Anyone
+  DNC is skipped and never dialed, even if they were marked DNC mid-session.
+- **Every attempt is logged** as a Dialer Call (no answer, busy, voicemail,
+  call back, connected), by the rep.
+- **Pause / Stop** buttons are on the panel. Dialing only moves forward while
+  the dialer panel is open; hang up your phone to end the session.
+  Get back to a running session with **Open dialer** (Ctrl/Cmd+K).
+- **Call Queue:** tick people or companies and click **Add to Call Queue**.
+  Entries are marked Called / Skipped - DNC / No phone number as they're dialed.
 
 ## How it works
 
@@ -124,7 +127,6 @@ recording-ready◄ SignalWire: "the recording is ready" → adds it to the recor
 | `src/fields/` | The "Dialer Calls" lists on person and company pages |
 | `src/shared/outcomes.ts` | The ten outcomes (edit here to change them) |
 | `src/shared/dnc.ts` | The Do Not Call rules |
-| `src/atlas/` | The Atlas → Opportunities sync (signature check, mapping, storage) |
 | `src/views/`, `src/navigation-menu-items/` | The Recorded Calls list and its sidebar entry |
 | `src/logic-functions/` | The five server-side steps above |
 | `src/shared/` | Helpers: phone formatting, SignalWire, settings |
@@ -147,20 +149,19 @@ Needs Node.js 24.5 or newer.
 3. In Twenty, go to **Settings → Apps → Corgi Dialer** and fill in:
    - **SignalWire Space URL**: e.g. `corgi-atlas.signalwire.com`
    - **SignalWire Project ID** and **SignalWire API Token** (kept secret;
-     never put these in GitHub)
+     never put these in GitHub or chat)
+   - **SignalWire Signing Key** (SignalWire dashboard → API Credentials →
+     Signing Key). When filled in, the dialer ignores any call update that
+     didn't come from SignalWire.
    - **Rep phone settings**, one entry per rep, keyed by Twenty login email:
      ```json
      {
        "ricky@beagleforpm.com": { "callerId": "+15551230000", "ringTo": "+15559870000" }
      }
      ```
-     `callerId` = the rep's SignalWire number. `ringTo` = the phone to ring
+     `callerId` = a SignalWire number you bought, or a number verified in SignalWire
+     (Phone Numbers → Verified Caller IDs). `ringTo` = the phone to ring
      first (their cell or desk phone). Always use the +1XXXXXXXXXX format.
-4. After your first successful test call, also fill in **SignalWire Signing
-   Key** (SignalWire dashboard → API Credentials → Signing Key → Show). From
-   then on, the dialer ignores any call update that didn't come from
-   SignalWire. If calls stop updating right after you add it, clear the field
-   and tell whoever maintains this app.
 
 ## Updating after code changes
 
@@ -196,5 +197,13 @@ yarn test:unit
 
 - Rep phone settings are one shared block of text; a proper settings screen
   comes later.
-- The DNC rules rely on the company's `dnc` switch and a `DNC` option in
-  Lead Status. Renaming either in Twenty breaks the check.
+- The DNC rules rely on the field names `dnc`, `doNotCall`,
+  `ycCompanyDoNotCall`, `leadStatus` (option `DNC`) and `callDisposition`
+  (option `DO_NOT_CALL_IN_PROGRESS`). Renaming them in Twenty breaks the check.
+- Parallel dialing hangs up on a second person who answers at the same time
+  (by choice, with no message). Federal rules cap these dropped calls at 3%
+  of answered calls and expect a short message saying who called; check with
+  whoever handles compliance. The "Call back" count shows how often it happens.
+- SignalWire's voicemail detection isn't perfect: now and then a person is treated
+  as a voicemail, or a voicemail is connected to the rep.
+- "Select all" on a huge view may only pass the records loaded on screen.

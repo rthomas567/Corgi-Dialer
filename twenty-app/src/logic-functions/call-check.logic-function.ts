@@ -6,6 +6,10 @@ import {
   ROUTE_CALL_CHECK,
 } from 'src/constants/universal-identifiers';
 import { getDoNotCallStatus } from 'src/shared/dnc';
+import { firstDialableNumber, type TwentyPhones } from 'src/shared/phone';
+import { getRecord } from 'src/shared/twenty-api';
+
+type Person = { id: string; phones?: TwentyPhones; mobilePhone?: TwentyPhones };
 
 // The panel asks this when it opens: "is this person OK to call?"
 const handler = async (event: RoutePayload) => {
@@ -14,7 +18,9 @@ const handler = async (event: RoutePayload) => {
     return { ok: false as const, message: 'No person was selected.' };
   }
   try {
-    const status = await getDoNotCallStatus(personId);
+    const person = await getRecord<Person>('people', personId);
+    const number = firstDialableNumber(person?.phones, person?.mobilePhone);
+    const status = await getDoNotCallStatus(personId, number);
     return { ok: true as const, ...status };
   } catch {
     return { ok: false as const, message: 'Could not check Do Not Call status.' };

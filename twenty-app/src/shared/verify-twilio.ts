@@ -1,6 +1,6 @@
 import type { RoutePayload } from 'twenty-sdk/logic-function';
 
-import { isGenuineSignalWireRequest } from 'src/shared/signalwire-signature';
+import { isGenuineTwilioRequest } from 'src/shared/twilio-signature';
 import { functionsBaseUrl } from 'src/shared/twenty-api';
 
 const rawBodyText = (event: RoutePayload): string | undefined => {
@@ -13,18 +13,19 @@ const rawBodyText = (event: RoutePayload): string | undefined => {
 };
 
 // True when the update should be trusted.
-// If no Signing Key is set yet, every update is accepted (setup/testing mode).
-export const isFromSignalWire = (
+// SignalWire signs updates with the Signing Key. If no Signing Key is set yet,
+// every update is accepted (setup/testing mode).
+export const isFromTwilio = (
   event: RoutePayload,
   routePath: string,
   formParams: Record<string, string>,
 ): boolean => {
-  const signingKey = (process.env.SIGNALWIRE_SIGNING_KEY ?? '').trim();
-  if (!signingKey) {
+  const authToken = (process.env.SIGNALWIRE_SIGNING_KEY ?? '').trim();
+  if (!authToken) {
     return true;
   }
-  return isGenuineSignalWireRequest({
-    signingKey,
+  return isGenuineTwilioRequest({
+    authToken,
     url: `${functionsBaseUrl()}${routePath}`,
     headers: event.headers ?? {},
     formParams,

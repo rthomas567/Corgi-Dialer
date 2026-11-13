@@ -4,9 +4,6 @@ import {
   APP_DESCRIPTION,
   APP_DISPLAY_NAME,
   APPLICATION_UNIVERSAL_IDENTIFIER,
-  VAR_ATLAS_API_KEY_ID,
-  VAR_ATLAS_ENVIRONMENT_ID,
-  VAR_ATLAS_WEBHOOK_SECRET_ID,
   VAR_DIALER_REPS_ID,
   VAR_RECORDING_ANNOUNCEMENT_ID,
   VAR_SIGNALWIRE_API_TOKEN_ID,
@@ -54,33 +51,11 @@ export default defineApplication({
       isSecret: false,
       value: 'Hello. This call may be recorded for quality and training purposes.',
     },
-    ATLAS_WEBHOOK_SECRET: {
-      universalIdentifier: VAR_ATLAS_WEBHOOK_SECRET_ID,
-      label: 'Atlas webhook signing secret',
-      description:
-        'The signing secret Atlas shows for the webhook subscription pointing at this app. Every Atlas message is checked against it; with it empty, all Atlas messages are refused.',
-      isSecret: true,
-    },
-    ATLAS_API_KEY: {
-      universalIdentifier: VAR_ATLAS_API_KEY_ID,
-      label: 'Atlas API key',
-      description:
-        'Optional. A cg_live_ key used to look up a quote (insured name, premium) when a message does not carry it.',
-      isSecret: true,
-    },
-    ATLAS_ENVIRONMENT: {
-      universalIdentifier: VAR_ATLAS_ENVIRONMENT_ID,
-      label: 'Atlas environment',
-      description:
-        'live (default): only real business creates Opportunities. test: only sandbox messages are processed, for trying the sync safely.',
-      isSecret: false,
-      value: 'live',
-    },
     DIALER_REPS: {
       universalIdentifier: VAR_DIALER_REPS_ID,
       label: 'Rep phone settings',
       description:
-        'One entry per rep, keyed by their Twenty login email. callerId = their SignalWire number, ringTo = the phone to ring first. Example: {"ricky@beagleforpm.com":{"callerId":"+15551230000","ringTo":"+15559870000"}}',
+        'One entry per rep, keyed by their Twenty login email. callerId = their SignalWire number (or a number verified in SignalWire), ringTo = the phone to ring first. Example: {"ricky@beagleforpm.com":{"callerId":"+15551230000","ringTo":"+15559870000"}}',
       isSecret: false,
       value: '{}',
     },

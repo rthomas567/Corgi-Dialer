@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { CALL_OUTCOMES, isCallOutcome } from 'src/shared/outcomes';
 import {
-  isGenuineSignalWireRequest,
+  isGenuineTwilioRequest,
   signFormRequest,
-} from 'src/shared/signalwire-signature';
+} from 'src/shared/twilio-signature';
 
-// Example checked against SignalWire's own validateRequest() and Twilio's.
+// Example checked against Twilio's own validateRequest() and Twilio's.
 const REFERENCE = {
   key: '12345',
   url: 'https://mycompany.com/myapp.php?foo=1&bar=2',
@@ -21,14 +21,14 @@ const REFERENCE = {
 };
 
 describe('signFormRequest', () => {
-  it('matches what the official SignalWire library expects', () => {
+  it('matches what the official Twilio library expects', () => {
     expect(signFormRequest(REFERENCE.key, REFERENCE.url, REFERENCE.params)).toBe(
       REFERENCE.signature,
     );
   });
 });
 
-describe('isGenuineSignalWireRequest', () => {
+describe('isGenuineTwilioRequest', () => {
   const url = 'https://corgi-smb.withtwenty.com/dialer/call-events';
   const params = { CallSid: 'CA1', CallStatus: 'completed' };
   const key = 'test-signing-key';
@@ -36,21 +36,21 @@ describe('isGenuineSignalWireRequest', () => {
 
   it('accepts a correctly signed update', () => {
     expect(
-      isGenuineSignalWireRequest({
-        signingKey: key,
+      isGenuineTwilioRequest({
+        authToken: key,
         url,
-        headers: { 'X-SignalWire-Signature': good },
+        headers: { 'X-Twilio-Signature': good },
         formParams: params,
       }),
     ).toBe(true);
   });
 
-  it('accepts the older header name too', () => {
+  it('accepts the SignalWire header', () => {
     expect(
-      isGenuineSignalWireRequest({
-        signingKey: key,
+      isGenuineTwilioRequest({
+        authToken: key,
         url,
-        headers: { 'x-twilio-signature': good },
+        headers: { 'x-signalwire-signature': good },
         formParams: params,
       }),
     ).toBe(true);
@@ -63,10 +63,10 @@ describe('isGenuineSignalWireRequest', () => {
       params,
     );
     expect(
-      isGenuineSignalWireRequest({
-        signingKey: key,
+      isGenuineTwilioRequest({
+        authToken: key,
         url,
-        headers: { 'x-signalwire-signature': withPort },
+        headers: { 'x-twilio-signature': withPort },
         formParams: params,
       }),
     ).toBe(true);
@@ -74,10 +74,10 @@ describe('isGenuineSignalWireRequest', () => {
 
   it('rejects a tampered update', () => {
     expect(
-      isGenuineSignalWireRequest({
-        signingKey: key,
+      isGenuineTwilioRequest({
+        authToken: key,
         url,
-        headers: { 'x-signalwire-signature': good },
+        headers: { 'x-twilio-signature': good },
         formParams: { ...params, CallStatus: 'in-progress' },
       }),
     ).toBe(false);
@@ -85,21 +85,21 @@ describe('isGenuineSignalWireRequest', () => {
 
   it('rejects an update with no signature', () => {
     expect(
-      isGenuineSignalWireRequest({ signingKey: key, url, headers: {}, formParams: params }),
+      isGenuineTwilioRequest({ authToken: key, url, headers: {}, formParams: params }),
     ).toBe(false);
   });
 });
 
-describe('isFromSignalWire', () => {
+describe('isFromTwilio', () => {
   afterEach(() => {
     delete process.env.SIGNALWIRE_SIGNING_KEY;
   });
 
-  it('lets everything through while no Signing Key is set', async () => {
-    const { isFromSignalWire } = await import('src/shared/verify-signalwire');
+  it('lets everything through while no Auth Token is set', async () => {
+    const { isFromTwilio } = await import('src/shared/verify-twilio');
     delete process.env.SIGNALWIRE_SIGNING_KEY;
     expect(
-      isFromSignalWire(
+      isFromTwilio(
         {
           headers: {},
           queryStringParameters: {},

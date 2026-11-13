@@ -2,24 +2,30 @@ import { isDialableNumber } from 'src/shared/phone';
 
 export type RepPhoneSettings = { callerId: string; ringTo: string };
 
-export type SignalWireSettings = {
-  spaceUrl: string;
-  projectId: string;
-  apiToken: string;
+// SignalWire test version: SignalWire's SignalWire-compatible API ("LaML").
+// accountSid = SignalWire Project ID, authToken = SignalWire API Token.
+export type TwilioSettings = {
+  accountSid: string;
+  authToken: string;
+  apiBase: string;
 };
 
-export const readSignalWireSettings = (): SignalWireSettings | null => {
+export const readTwilioSettings = (): TwilioSettings | null => {
   const spaceUrl = (process.env.SIGNALWIRE_SPACE_URL ?? '')
     .trim()
     .replace(/^https?:\/\//, '')
     .replace(/\/+$/, '');
-  const projectId = (process.env.SIGNALWIRE_PROJECT_ID ?? '').trim();
-  const apiToken = (process.env.SIGNALWIRE_API_TOKEN ?? '').trim();
+  const accountSid = (process.env.SIGNALWIRE_PROJECT_ID ?? '').trim();
+  const authToken = (process.env.SIGNALWIRE_API_TOKEN ?? '').trim();
 
-  if (!spaceUrl || !projectId || !apiToken) {
+  if (!spaceUrl || !accountSid || !authToken) {
     return null;
   }
-  return { spaceUrl, projectId, apiToken };
+  return {
+    accountSid,
+    authToken,
+    apiBase: `https://${spaceUrl}/api/laml/2010-04-01/Accounts/${accountSid}`,
+  };
 };
 
 export const readRepSettings = (

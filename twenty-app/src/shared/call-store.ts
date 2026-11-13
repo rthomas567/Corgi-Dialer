@@ -13,7 +13,13 @@ export type CallStage =
 export type StoredCall = {
   callSid: string;
   workspaceMemberId: string;
-  personId: string;
+  // Who was called. Company calls (dialing a company's main line) have no person.
+  personId: string | null;
+  companyId?: string | null;
+  displayName?: string;
+  // Set for calls placed by the power / parallel dialer.
+  sessionId?: string;
+  queueItemId?: string | null;
   prospectNumber: string;
   callerId: string;
   stage: CallStage;

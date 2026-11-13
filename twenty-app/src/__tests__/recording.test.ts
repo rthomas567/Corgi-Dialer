@@ -41,13 +41,13 @@ vi.mock('src/shared/call-store', async () => {
   };
 });
 
-vi.mock('src/shared/signalwire', () => ({
+vi.mock('src/shared/twilio', () => ({
   ringRepPhone: async () => 'CA-parent',
   endCall: async () => undefined,
 }));
 
 import { callResultForEndReason } from 'src/shared/call-results';
-import { signFormRequest } from 'src/shared/signalwire-signature';
+import { signFormRequest } from 'src/shared/twilio-signature';
 import bridge from 'src/logic-functions/bridge.logic-function';
 import callEvents from 'src/logic-functions/call-events.logic-function';
 import recordingReady, { toPlayableUrl } from 'src/logic-functions/recording-ready.logic-function';
@@ -100,9 +100,9 @@ describe('calling instructions', () => {
     expect(xml).toContain('<Say>Calls are recorded &amp; reviewed &lt;always&gt;.</Say>');
   });
 
-  it('ignores fake requests once a Signing Key is set', async () => {
-    process.env.SIGNALWIRE_SIGNING_KEY = 'key';
-    const res = await run(whisper, { CallSid: 'CA-child' }, { 'x-signalwire-signature': 'forged' });
+  it('ignores fake requests once a Auth Token is set', async () => {
+    process.env.SIGNALWIRE_API_TOKEN = 'key'; process.env.SIGNALWIRE_SIGNING_KEY = 'key'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    const res = await run(whisper, { CallSid: 'CA-child' }, { 'x-twilio-signature': 'forged' });
     expect(res.status).toBe(403);
   });
 });
@@ -111,14 +111,14 @@ describe('recordings', () => {
   it('links the MP3 onto the Dialer Call record', async () => {
     await run(recordingReady, {
       CallSid: 'CA-parent', RecordingStatus: 'completed', RecordingDuration: '94',
-      RecordingUrl: 'https://corgi-atlas.signalwire.com/api/laml/2010-04-01/Accounts/a/Recordings/r1',
+      RecordingUrl: 'https://api.twilio.com/2010-04-01/Accounts/ACa/Recordings/RE1',
     });
     expect(updates).toEqual([
       {
         object: 'dialerCalls', id: 'rec-1', runAs: 'application',
         data: {
           recording: {
-            primaryLinkUrl: 'https://corgi-atlas.signalwire.com/api/laml/2010-04-01/Accounts/a/Recordings/r1.mp3',
+            primaryLinkUrl: 'https://api.twilio.com/2010-04-01/Accounts/ACa/Recordings/RE1.mp3',
             primaryLinkLabel: 'Play recording', secondaryLinks: null,
           },
           recordingSeconds: 94,
@@ -139,11 +139,11 @@ describe('recordings', () => {
     expect(updates).toEqual([]);
   });
 
-  it('accepts a genuinely signed recording update when a Signing Key is set', async () => {
-    process.env.SIGNALWIRE_SIGNING_KEY = 'key';
+  it('accepts a genuinely signed recording update when a Auth Token is set', async () => {
+    process.env.SIGNALWIRE_API_TOKEN = 'key'; process.env.SIGNALWIRE_SIGNING_KEY = 'key'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
     const params = { CallSid: 'CA-parent', RecordingStatus: 'completed', RecordingUrl: 'https://x/Recordings/r3' };
     const signature = signFormRequest('key', 'https://corgi-smb.withtwenty.com/dialer/recording-ready', params);
-    await run(recordingReady, params, { 'x-signalwire-signature': signature });
+    await run(recordingReady, params, { 'x-twilio-signature': signature });
     expect(updates).toHaveLength(1);
   });
 
@@ -176,9 +176,8 @@ describe('call result on the record', () => {
 
 describe('starting a call creates the record right away', () => {
   it('as the rep, with their name, In progress', async () => {
-    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
-    process.env.SIGNALWIRE_PROJECT_ID = 'p';
-    process.env.SIGNALWIRE_API_TOKEN = 't';
+    process.env.SIGNALWIRE_PROJECT_ID = 'ACp';
+    process.env.SIGNALWIRE_API_TOKEN = 't'; process.env.SIGNALWIRE_SIGNING_KEY = 't'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
     process.env.DIALER_REPS = JSON.stringify({ 'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' } });
     records['workspaceMembers:rep-1'] = { id: 'rep-1', userEmail: 'ricky@beagleforpm.com', name: { firstName: 'Ricky', lastName: 'Thomas' } };
     records['people:p1'] = { id: 'p1', name: { firstName: 'Jane', lastName: 'Doe' }, companyId: 'c1', phones: { primaryPhoneNumber: '5551234567', primaryPhoneCallingCode: '+1' } };

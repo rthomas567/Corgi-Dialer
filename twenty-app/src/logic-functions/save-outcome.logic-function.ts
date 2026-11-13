@@ -13,6 +13,7 @@ import {
   type CompanyRecord,
   DNC_LEAD_STATUS,
   DNC_OUTCOME,
+  blockNumber,
   isCalendarDate,
 } from 'src/shared/dnc';
 import { isCallOutcome, outcomeLabel } from 'src/shared/outcomes';
@@ -49,9 +50,10 @@ const handler = async (
     return { ok: false as const, message: 'Call not found.' };
   }
 
-  const person = await getRecord<Person>('people', call.personId);
+  const person = call.personId ? await getRecord<Person>('people', call.personId) : null;
   const fullName =
     [person?.name?.firstName, person?.name?.lastName].filter(Boolean).join(' ') ||
+    call.displayName ||
     'Unknown person';
 
   const cleanNotes =
@@ -65,8 +67,8 @@ const handler = async (
     phoneNumber: call.prospectNumber,
     calledAt: call.createdAt,
     signalWireCallId: call.callSid,
-    personId: call.personId,
-    companyId: person?.companyId ?? null,
+    personId: call.personId ?? null,
+    companyId: person?.companyId ?? call.companyId ?? null,
     ...(call.repName ? { rep: call.repName } : {}),
     ...(call.recordingUrl
       ? {
@@ -109,7 +111,29 @@ const handler = async (
   const warnings: string[] = [];
   const isDnc = outcome === DNC_OUTCOME;
   let companyMarkedDnc = false;
-  const companyId = person?.companyId ?? null;
+  const companyId = person?.companyId ?? call.companyId ?? null;
+
+  // A number saved as DNC is never dialed again, whichever record it is on.
+  if (isDnc) {
+    try {
+      await blockNumber(call.prospectNumber);
+    } catch {
+      warnings.push('The phone number could not be added to the blocked list.');
+    }
+  }
+
+  // Also flag the person themselves, where the workspace has that switch.
+  if (isDnc && call.personId) {
+    await updateRecord('people', call.personId, { doNotCall: true }).catch(() => undefined);
+  }
+
+  // Calls from the Call Queue: mark the queue entry as done.
+  if (call.queueItemId) {
+    await updateRecord('callQueueItems', call.queueItemId, {
+      status: isDnc ? 'SKIPPED_DNC' : 'CALLED',
+      lastResult: outcomeLabel(outcome),
+    }).catch(() => undefined);
+  }
 
   if (companyId) {
     const company = await getRecord<CompanyRecord>('companies', companyId).catch(() => null);
@@ -144,7 +168,7 @@ const handler = async (
         warnings.push('The company is blocked from calls, but its Lead Status could not be set to DNC.');
       }
     }
-  } else if (isDnc) {
+  } else if (isDnc && call.personId) {
     warnings.push(
       'This person has no company, so only this person is blocked from calls. Link them to a company to block the whole company.',
     );

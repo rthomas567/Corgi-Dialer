@@ -46,7 +46,7 @@ type CheckResponse =
   | {
       ok: true;
       doNotCall: boolean;
-      scope: 'company' | 'person' | null;
+      scope: 'company' | 'person' | 'number' | null;
       reason: string | null;
       companyName: string | null;
     }
@@ -58,7 +58,7 @@ type DncState =
 
 const DNC_VALUE = 'DNC';
 
-const todayInBrowser = () => {
+export const todayInBrowser = () => {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
@@ -99,7 +99,7 @@ const ACTIVE_STAGES: Stage[] = ['starting', 'rep-ringing', 'prospect-ringing', '
 const POLL_MS = 2000;
 const DNC_RECHECK_MS = 15000;
 
-const formatDuration = (totalSeconds: number) => {
+export const formatDuration = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
@@ -139,7 +139,7 @@ type OutcomePickerProps = {
 };
 
 // The ten outcomes as a two-column grid of toggle buttons.
-const OutcomePicker = ({ selected, isLocked, onSelect }: OutcomePickerProps) => {
+export const OutcomePicker = ({ selected, isLocked, onSelect }: OutcomePickerProps) => {
   const theme = useTheme();
   return (
     <div
@@ -201,7 +201,7 @@ type ActionButtonProps = {
 };
 
 // A plain button styled with Twenty's own colors.
-const ActionButton = ({
+export const ActionButton = ({
   label,
   tone,
   size = 'regular',
@@ -309,7 +309,7 @@ export const Dialer = () => {
             setDnc({
               status: 'blocked',
               reason: result.reason ?? 'This lead is marked Do Not Call.',
-              scope: result.scope ?? 'company',
+              scope: result.scope === 'person' || result.scope === 'number' ? 'person' : 'company',
             });
           } else {
             setDnc({ status: 'ok', companyName: result.companyName });

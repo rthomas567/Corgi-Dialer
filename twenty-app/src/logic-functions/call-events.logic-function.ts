@@ -6,11 +6,11 @@ import {
   ROUTE_CALL_EVENTS,
 } from 'src/constants/universal-identifiers';
 import { getCall, updateCall } from 'src/shared/call-store';
-import { lamlResponse } from 'src/shared/laml';
+import { twimlResponse } from 'src/shared/twiml';
 import { readFormBody } from 'src/shared/route-body';
 import { syncCallResult } from 'src/shared/sync-record';
-import { SIGNATURE_HEADERS } from 'src/shared/signalwire-signature';
-import { isFromSignalWire } from 'src/shared/verify-signalwire';
+import { SIGNATURE_HEADERS } from 'src/shared/twilio-signature';
+import { isFromTwilio } from 'src/shared/verify-twilio';
 
 const FINISHED = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled']);
 
@@ -18,7 +18,7 @@ const FINISHED = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled'
 // prospect ringing, prospect answered, call ended.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
-  if (!isFromSignalWire(event, ROUTE_CALL_EVENTS, form)) {
+  if (!isFromTwilio(event, ROUTE_CALL_EVENTS, form)) {
     return new Response('Not from SignalWire', { status: 403 });
   }
   const status = (form.CallStatus || '').toLowerCase();
@@ -27,7 +27,7 @@ const handler = async (event: RoutePayload) => {
 
   const call = parentSid ? await getCall(parentSid) : null;
   if (!call) {
-    return lamlResponse('');
+    return twimlResponse('');
   }
 
   const now = new Date().toISOString();
@@ -55,7 +55,7 @@ const handler = async (event: RoutePayload) => {
         }),
       );
     }
-    return lamlResponse('');
+    return twimlResponse('');
   }
 
   // Rep's leg
@@ -73,7 +73,7 @@ const handler = async (event: RoutePayload) => {
     );
   }
 
-  return lamlResponse('');
+  return twimlResponse('');
 };
 
 export default defineLogicFunction({

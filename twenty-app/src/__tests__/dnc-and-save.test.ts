@@ -48,7 +48,7 @@ vi.mock('src/shared/call-store', async () => {
 });
 
 const dialed: string[] = [];
-vi.mock('src/shared/signalwire', () => ({
+vi.mock('src/shared/twilio', () => ({
   ringRepPhone: async (_settings: unknown, input: { repPhone: string }) => {
     dialed.push(input.repPhone);
     return 'CA-new';
@@ -139,10 +139,11 @@ describe('saving a call', () => {
     expect(updates).toEqual([]);
   });
 
-  it('DNC turns on the switch and sets Lead Status to DNC', async () => {
+  it('DNC flags the person, turns on the company switch, and sets Lead Status to DNC', async () => {
     const result = await handler(eventWith({ callSid: 'CA1', outcome: 'DNC', localDate: '2026-09-24' }), context);
     expect(result).toMatchObject({ ok: true, companyMarkedDnc: true, warning: null });
     expect(updates).toEqual([
+      { object: 'people', id: 'p1', data: { doNotCall: true } },
       { object: 'companies', id: 'c1', data: { lastContacted: '2026-09-24', dnc: true } },
       { object: 'companies', id: 'c1', data: { leadStatus: 'DNC' } },
     ]);
@@ -180,9 +181,8 @@ describe('starting a call', () => {
   const start = startCall.config.handler as (event: any, context: any) => Promise<any>;
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
-    process.env.SIGNALWIRE_PROJECT_ID = 'project';
-    process.env.SIGNALWIRE_API_TOKEN = 'token';
+    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
+    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });
@@ -196,7 +196,7 @@ describe('starting a call', () => {
     expect(dialed).toEqual(['+15559999999']);
   });
 
-  it('refuses to dial anyone at a DNC company, without contacting SignalWire', async () => {
+  it('refuses to dial anyone at a DNC company, without contacting Twilio', async () => {
     records['companies:c1'].dnc = true;
     const result = await start(eventWith({ personId: 'p1' }), context);
     expect(result.ok).toBe(false);
@@ -214,7 +214,18 @@ describe('starting a call', () => {
 describe('an outcome is required after every answered call', () => {
   const start = startCall.config.handler as (event: any, context: any) => Promise<any>;
   const save = saveOutcome.config.handler as (event: any, context: any) => Promise<any>;
-  const answer = bridge.config.handler as (event: any) => Promise<any>;
+  const bridgeHandler = bridge.config.handler as (event: any) => Promise<any>;
+  // Twilio signs its "rep answered" request with the Auth Token.
+  const answer = async (event: any) => {
+    const { signFormRequest } = await import('src/shared/twilio-signature');
+    const { ROUTE_BRIDGE } = await import('src/constants/universal-identifiers');
+    const signature = signFormRequest(
+      process.env.SIGNALWIRE_SIGNING_KEY ?? '',
+      `https://corgi-smb.withtwenty.com${ROUTE_BRIDGE}`,
+      event.body,
+    );
+    return bridgeHandler({ ...event, headers: { 'x-signalwire-signature': signature } });
+  };
   const mine = myCall.config.handler as (event: any, context: any) => Promise<any>;
   const endCall = (sid: string, endReason = 'completed') => {
     storedCalls[sid] = { ...storedCalls[sid], stage: 'ended', endReason };
@@ -222,9 +233,8 @@ describe('an outcome is required after every answered call', () => {
 
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
-    process.env.SIGNALWIRE_PROJECT_ID = 'project';
-    process.env.SIGNALWIRE_API_TOKEN = 'token';
+    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
+    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });
@@ -281,9 +291,8 @@ describe('after a DNC outcome is saved', () => {
 
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_SPACE_URL = 'corgi-atlas.signalwire.com';
-    process.env.SIGNALWIRE_PROJECT_ID = 'project';
-    process.env.SIGNALWIRE_API_TOKEN = 'token';
+    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
+    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });
@@ -292,7 +301,7 @@ describe('after a DNC outcome is saved', () => {
     records['people:p9'] = { id: 'p9', companyId: 'c1', phones: { primaryPhoneNumber: '5557654321', primaryPhoneCallingCode: '+1' } };
   });
 
-  it('nobody at that company can be dialed afterwards, and SignalWire is never contacted', async () => {
+  it('nobody at that company can be dialed afterwards, and Twilio is never contacted', async () => {
     // A fake updateRecord records changes; apply them so the company really becomes DNC.
     await save(eventWith({ callSid: 'CA1', outcome: 'DNC', localDate: '2026-09-24' }), context);
     for (const u of updates.filter((x) => x.object === 'companies')) {

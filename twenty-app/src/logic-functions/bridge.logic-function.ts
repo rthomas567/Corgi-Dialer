@@ -9,10 +9,10 @@ import {
   ROUTE_WHISPER,
 } from 'src/constants/universal-identifiers';
 import { getCall, updateCall } from 'src/shared/call-store';
-import { escapeXml, lamlResponse } from 'src/shared/laml';
+import { escapeXml, twimlResponse } from 'src/shared/twiml';
 import { readFormBody } from 'src/shared/route-body';
-import { SIGNATURE_HEADERS } from 'src/shared/signalwire-signature';
-import { isFromSignalWire } from 'src/shared/verify-signalwire';
+import { SIGNATURE_HEADERS } from 'src/shared/twilio-signature';
+import { isFromTwilio } from 'src/shared/verify-twilio';
 import { functionsBaseUrl } from 'src/shared/twenty-api';
 
 // SignalWire calls this the moment the rep picks up their phone.
@@ -21,14 +21,14 @@ import { functionsBaseUrl } from 'src/shared/twenty-api';
 // request itself, so this address can't be used to dial other numbers.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
-  if (!isFromSignalWire(event, ROUTE_BRIDGE, form)) {
+  if (!isFromTwilio(event, ROUTE_BRIDGE, form)) {
     return new Response('Not from SignalWire', { status: 403 });
   }
   const callSid = form.CallSid;
   const call = callSid ? await getCall(callSid) : null;
 
   if (!call || call.stage === 'ended') {
-    return lamlResponse('<Say>This call could not be connected.</Say><Hangup/>');
+    return twimlResponse('<Say>This call could not be connected.</Say><Hangup/>');
   }
 
   await updateCall(call.callSid, { stage: 'prospect-ringing', repAnswered: true });
@@ -43,7 +43,7 @@ const handler = async (event: RoutePayload) => {
     ? ` url="${escapeXml(`${base}${ROUTE_WHISPER}`)}" method="POST"`
     : '';
 
-  return lamlResponse(
+  return twimlResponse(
     `<Say>Connecting.</Say>` +
       `<Dial callerId="${escapeXml(call.callerId)}" timeout="30" answerOnBridge="true"` +
       ` record="record-from-answer" recordingStatusCallback="${recordingUrl}"` +
