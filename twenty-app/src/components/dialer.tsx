@@ -248,12 +248,14 @@ export const ActionButton = ({
 };
 
 // The whole dialer, shown as the "Call" box at the top of each person's page.
-export const Dialer = () => {
+// `personId` is passed when the dialer is shown inside another screen (the
+// People tab of the company dialer); otherwise it's the open person page.
+export const Dialer = ({ personId: personIdProp }: { personId?: string } = {}) => {
   const theme = useTheme();
   const recordId = useRecordId();
   const selectedRecordIds = useSelectedRecordIds();
   const personId =
-    recordId ?? (selectedRecordIds.length === 1 ? selectedRecordIds[0] : null);
+    personIdProp ?? recordId ?? (selectedRecordIds.length === 1 ? selectedRecordIds[0] : null);
 
   const [person, setPerson] = useState<Person | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

@@ -143,3 +143,7 @@ export const ROUTE_SESSION_REP_EVENTS = '/dialer/session/rep-events';
 export const ROUTE_SESSION_LEG_ANSWERED = '/dialer/session/leg-answered';
 export const ROUTE_SESSION_LEG_EVENTS = '/dialer/session/leg-events';
 export const ROUTE_QUEUE_ADD = '/dialer/queue/add';
+
+// Version 9: People tab in the company dialer
+export const COMPANY_PEOPLE_FUNCTION_ID = 'f24dd5a4-ad3b-42bb-b1d0-3348784d2eae';
+export const ROUTE_COMPANY_PEOPLE = '/dialer/company-people';
