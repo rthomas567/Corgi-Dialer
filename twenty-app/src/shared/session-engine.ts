@@ -39,12 +39,12 @@ export const clampLines = (mode: 'power' | 'parallel', lines: unknown) => {
   return Math.min(MAX_LINES, Math.max(2, value));
 };
 
-// SignalWire's AnsweredBy: "human", "unknown", "machine_start",
+// Twilio's AnsweredBy: "human", "unknown", "machine_start",
 // "machine_end_beep", "machine_end_silence", "machine_end_other", "fax".
 export const isMachineAnswer = (answeredBy: string | undefined) =>
   Boolean(answeredBy) && (answeredBy!.startsWith('machine') || answeredBy === 'fax');
 
-// What a finished line's SignalWire status means for us.
+// What a finished line's Twilio status means for us.
 export const finalStatusFromTwilio = (callStatus: string): TargetStatus => {
   switch (callStatus) {
     case 'busy':
@@ -189,7 +189,7 @@ const dialOne = async (
     return {
       ...result,
       status: 'failed',
-      reason: error instanceof Error ? error.message : 'SignalWire could not place the call.',
+      reason: error instanceof Error ? error.message : 'Twilio could not place the call.',
     };
   }
 

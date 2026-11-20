@@ -56,6 +56,6 @@ export const getRecord = async <T>(
   return unwrapRecord<T>(response);
 };
 
-// Where SignalWire should send its updates for this app.
+// Where Twilio should send its updates for this app.
 export const functionsBaseUrl = () =>
   process.env.TWENTY_FUNCTIONS_URL || `${process.env.TWENTY_API_URL}/s`;

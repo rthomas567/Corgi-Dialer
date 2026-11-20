@@ -27,7 +27,7 @@ const handler = async (
 
   const twilio = readTwilioSettings();
   if (!twilio) {
-    return { ok: false as const, message: 'SignalWire is not set up.' };
+    return { ok: false as const, message: 'Twilio is not set up.' };
   }
 
   if (call.stage !== 'ended') {

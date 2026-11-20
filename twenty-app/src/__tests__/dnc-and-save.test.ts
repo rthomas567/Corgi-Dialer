@@ -181,8 +181,8 @@ describe('starting a call', () => {
   const start = startCall.config.handler as (event: any, context: any) => Promise<any>;
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
-    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_ACCOUNT_SID = 'ACproject';
+    process.env.TWILIO_AUTH_TOKEN = 'token';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });
@@ -220,11 +220,11 @@ describe('an outcome is required after every answered call', () => {
     const { signFormRequest } = await import('src/shared/twilio-signature');
     const { ROUTE_BRIDGE } = await import('src/constants/universal-identifiers');
     const signature = signFormRequest(
-      process.env.SIGNALWIRE_SIGNING_KEY ?? '',
+      process.env.TWILIO_AUTH_TOKEN ?? '',
       `https://corgi-smb.withtwenty.com${ROUTE_BRIDGE}`,
       event.body,
     );
-    return bridgeHandler({ ...event, headers: { 'x-signalwire-signature': signature } });
+    return bridgeHandler({ ...event, headers: { 'x-twilio-signature': signature } });
   };
   const mine = myCall.config.handler as (event: any, context: any) => Promise<any>;
   const endCall = (sid: string, endReason = 'completed') => {
@@ -233,8 +233,8 @@ describe('an outcome is required after every answered call', () => {
 
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
-    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_ACCOUNT_SID = 'ACproject';
+    process.env.TWILIO_AUTH_TOKEN = 'token';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });
@@ -291,8 +291,8 @@ describe('after a DNC outcome is saved', () => {
 
   beforeEach(() => {
     dialed.length = 0;
-    process.env.SIGNALWIRE_PROJECT_ID = 'ACproject';
-    process.env.SIGNALWIRE_API_TOKEN = 'token'; process.env.SIGNALWIRE_SIGNING_KEY = 'token'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_ACCOUNT_SID = 'ACproject';
+    process.env.TWILIO_AUTH_TOKEN = 'token';
     process.env.DIALER_REPS = JSON.stringify({
       'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },
     });

@@ -1,24 +1,26 @@
 import type { TwilioSettings } from 'src/shared/settings';
 
-// SignalWire's SignalWire-compatible REST API (LaML).
-const apiBase = (settings: TwilioSettings) => settings.apiBase;
+// Twilio's Voice REST API.
+const apiBase = (settings: TwilioSettings) =>
+  `https://api.twilio.com/2010-04-01/Accounts/${settings.accountSid}`;
 
 const authHeader = (settings: TwilioSettings) =>
   `Basic ${Buffer.from(`${settings.accountSid}:${settings.authToken}`).toString('base64')}`;
 
-const post = async (
+const request = async (
   settings: TwilioSettings,
+  method: 'GET' | 'POST',
   path: string,
-  form: URLSearchParams,
+  form?: URLSearchParams,
 ) => {
   const response = await fetch(`${apiBase(settings)}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       Authorization: authHeader(settings),
-      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
       Accept: 'application/json',
     },
-    body: form.toString(),
+    body: form?.toString(),
   });
 
   const text = await response.text();
@@ -34,12 +36,15 @@ const post = async (
       (json.message as string) ||
       (json.errors as Array<{ message?: string }> | undefined)?.[0]?.message ||
       response.statusText;
-    throw new Error(`SignalWire said: ${message} (status ${response.status})`);
+    throw new Error(`Twilio said: ${message} (status ${response.status})`);
   }
   return json;
 };
 
-// Step 1 of a call: ring the rep's own phone. When they answer, SignalWire
+const post = (settings: TwilioSettings, path: string, form: URLSearchParams) =>
+  request(settings, 'POST', path, form);
+
+// Step 1 of a call: ring the rep's own phone. When they answer, Twilio
 // asks `bridgeUrl` what to do next (dial the prospect).
 export const ringRepPhone = async (
   settings: TwilioSettings,
@@ -66,7 +71,7 @@ export const ringRepPhone = async (
   const json = await post(settings, '/Calls.json', form);
   const sid = json.sid;
   if (typeof sid !== 'string') {
-    throw new Error('SignalWire did not return a call ID.');
+    throw new Error('Twilio did not return a call ID.');
   }
   return sid;
 };
@@ -77,7 +82,7 @@ export const endCall = async (settings: TwilioSettings, callSid: string) => {
   await post(settings, `/Calls/${callSid}.json`, form);
 };
 
-// Power/parallel dialing: call one prospect directly. SignalWire first listens to
+// Power/parallel dialing: call one prospect directly. Twilio first listens to
 // whoever picks up to tell a person from a voicemail, then asks `answeredUrl`
 // what to do (with AnsweredBy = human / machine_start / fax / unknown).
 export const dialProspect = async (
@@ -107,7 +112,7 @@ export const dialProspect = async (
   const json = await post(settings, '/Calls.json', form);
   const sid = json.sid;
   if (typeof sid !== 'string') {
-    throw new Error('SignalWire did not return a call ID.');
+    throw new Error('Twilio did not return a call ID.');
   }
   return sid;
 };

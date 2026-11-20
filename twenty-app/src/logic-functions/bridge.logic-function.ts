@@ -15,14 +15,14 @@ import { SIGNATURE_HEADERS } from 'src/shared/twilio-signature';
 import { isFromTwilio } from 'src/shared/verify-twilio';
 import { functionsBaseUrl } from 'src/shared/twenty-api';
 
-// SignalWire calls this the moment the rep picks up their phone.
+// Twilio calls this the moment the rep picks up their phone.
 // We answer with instructions: "now dial the prospect".
 // The number to dial comes from our own stored call, never from the
 // request itself, so this address can't be used to dial other numbers.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_BRIDGE, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
   const callSid = form.CallSid;
   const call = callSid ? await getCall(callSid) : null;
@@ -57,7 +57,7 @@ const handler = async (event: RoutePayload) => {
 export default defineLogicFunction({
   universalIdentifier: BRIDGE_FUNCTION_ID,
   name: 'dialer-bridge',
-  description: 'Tells SignalWire to dial the prospect once the rep answers.',
+  description: 'Tells Twilio to dial the prospect once the rep answers.',
   handler,
   httpRouteTriggerSettings: {
     path: ROUTE_BRIDGE,

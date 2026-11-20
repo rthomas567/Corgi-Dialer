@@ -83,7 +83,7 @@ const handler = async (event: RoutePayload, context: LogicFunctionExecutionConte
 
   const twilio = readTwilioSettings();
   if (!twilio) {
-    return fail('SignalWire is not set up yet. Ask an admin to fill in the SignalWire settings in Settings > Apps > Corgi Dialer.');
+    return fail('Twilio is not set up yet. Ask an admin to fill in the Twilio settings in Settings > Apps > Corgi Dialer.');
   }
   const member = await getRecord<WorkspaceMember>('workspaceMembers', workspaceMemberId);
   if (!member?.userEmail) {
@@ -105,7 +105,7 @@ const handler = async (event: RoutePayload, context: LogicFunctionExecutionConte
       eventsUrl: `${base}${ROUTE_SESSION_REP_EVENTS}`,
     });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : 'SignalWire could not ring your phone.');
+    return fail(error instanceof Error ? error.message : 'Twilio could not ring your phone.');
   }
 
   const targets: SessionTarget[] = ids.map((id) => ({ kind, id }));

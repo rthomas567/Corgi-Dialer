@@ -42,7 +42,7 @@ const logResult = async (leg: Leg, status: TargetStatus, extra: Record<string, u
   ).catch(() => undefined);
 };
 
-// SignalWire asks this the moment someone picks up one of the parallel lines,
+// Twilio asks this the moment someone picks up one of the parallel lines,
 // after it has listened long enough to tell a person from a voicemail.
 //  - Voicemail / fax: hang up and log it. The rep never hears it.
 //  - A person, and the rep is free: connect them to the rep.
@@ -51,7 +51,7 @@ const logResult = async (leg: Leg, status: TargetStatus, extra: Record<string, u
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_SESSION_LEG_ANSWERED, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
 
   const callSid = form.CallSid;

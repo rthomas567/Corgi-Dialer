@@ -54,18 +54,13 @@ describe('readRepSettings', () => {
 });
 
 describe('readTwilioSettings', () => {
-  it('builds the SignalWire address from a pasted space URL', () => {
-    process.env.SIGNALWIRE_SPACE_URL = 'https://corgi-atlas.signalwire.com/';
-    process.env.SIGNALWIRE_PROJECT_ID = ' project ';
-    process.env.SIGNALWIRE_API_TOKEN = 'token\n';
-    expect(readTwilioSettings()).toEqual({
-      accountSid: 'project',
-      authToken: 'token',
-      apiBase: 'https://corgi-atlas.signalwire.com/api/laml/2010-04-01/Accounts/project',
-    });
+  it('trims pasted values', () => {
+    process.env.TWILIO_ACCOUNT_SID = ' ACproject ';
+    process.env.TWILIO_AUTH_TOKEN = 'token\n';
+    expect(readTwilioSettings()).toEqual({ accountSid: 'ACproject', authToken: 'token' });
   });
   it('returns null when anything is missing', () => {
-    process.env.SIGNALWIRE_API_TOKEN = '';
+    process.env.TWILIO_AUTH_TOKEN = '';
     expect(readTwilioSettings()).toBeNull();
   });
 });

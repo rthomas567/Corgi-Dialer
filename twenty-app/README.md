@@ -1,12 +1,8 @@
-> **SignalWire test version.** Same dialer as the Twilio version, but it runs on
-> SignalWire so it can be tested with the existing SignalWire account. Settings
-> already filled in for SignalWire are kept.
-
 # Corgi Dialer (Twenty app)
 
 Adds a **Call** box with a big orange **Call** button to the top of every
 person's page in Twenty. The rep's own phone rings first; when they pick
-up, SignalWire dials the person and shows the rep's work number as caller ID.
+up, Twilio dials the person and shows the rep's work number as caller ID.
 
 After the call, the rep picks one of ten outcomes (Connected, Voicemail, DNC,
 Busy, No Answer, Receptionist, High Interest, Low Interest, Hard No, Wrong
@@ -46,7 +42,7 @@ the day of the call (it never moves backwards).
   recording. Only clear the announcement if you're sure you don't need it.
 - Recording links play without a login, and their addresses are long and random.
   Anyone who has a link can play it, so don't share links outside Twenty.
-  Recordings are stored by SignalWire.
+  Recordings are stored by Twilio.
 
 ### Do Not Call
 
@@ -82,7 +78,7 @@ the day of the call (it never moves backwards).
   else picks up at the same moment, they're hung up on (no message) and a
   yellow **"also picked up - call them back"** notice appears with their number.
   Lines hung up before anyone answered go back on the list once.
-- **Voicemails** are detected by SignalWire, hung up, and logged as Voicemail. You
+- **Voicemails** are detected by Twilio, hung up, and logged as Voicemail. You
   never hear them.
 - **Outcome:** after each conversation, pick an outcome. Dialing continues
   only once it's saved.
@@ -102,19 +98,19 @@ the day of the call (it never moves backwards).
 Rep clicks "Call" in Twenty
         │
         ▼
-start-call  ──►  SignalWire rings the rep's phone
+start-call  ──►  Twilio rings the rep's phone
                           │  rep picks up
                           ▼
-bridge      ──►  SignalWire dials the person (rep's number as caller ID)
+bridge      ──►  Twilio dials the person (rep's number as caller ID)
                           │
-call-events ◄──  SignalWire reports: ringing / answered / ended
+call-events ◄──  Twilio reports: ringing / answered / ended
 call-status ◄──  the panel checks progress every 2 seconds
 hang-up     ──►  ends the call from the panel
 save-outcome──►  saves outcome + notes as a Dialer Call record,
                  updates Last Contacted, and applies DNC
 call-check  ──►  the panel asks "is this person OK to call?" when it opens
 whisper     ──►  plays the recording announcement to the person called
-recording-ready◄ SignalWire: "the recording is ready" → adds it to the record
+recording-ready◄ Twilio: "the recording is ready" → adds it to the record
 ```
 
 | Folder | What's in it |
@@ -129,8 +125,8 @@ recording-ready◄ SignalWire: "the recording is ready" → adds it to the recor
 | `src/shared/dnc.ts` | The Do Not Call rules |
 | `src/views/`, `src/navigation-menu-items/` | The Recorded Calls list and its sidebar entry |
 | `src/logic-functions/` | The five server-side steps above |
-| `src/shared/` | Helpers: phone formatting, SignalWire, settings |
-| `src/application-config.ts` | The app's settings (SignalWire login, rep phones) |
+| `src/shared/` | Helpers: phone formatting, Twilio, settings |
+| `src/application-config.ts` | The app's settings (Twilio login, rep phones) |
 
 ## One-time install (admin)
 
@@ -147,21 +143,22 @@ Needs Node.js 24.5 or newer.
    `remote:add` opens a browser to sign in to Twenty. `apply` shows what
    will be added and asks you to confirm.
 3. In Twenty, go to **Settings → Apps → Corgi Dialer** and fill in:
-   - **SignalWire Space URL**: e.g. `corgi-atlas.signalwire.com`
-   - **SignalWire Project ID** and **SignalWire API Token** (kept secret;
-     never put these in GitHub or chat)
-   - **SignalWire Signing Key** (SignalWire dashboard → API Credentials →
-     Signing Key). When filled in, the dialer ignores any call update that
-     didn't come from SignalWire.
+   - **Twilio Account SID** and **Twilio Auth Token** (Twilio Console home
+     page → Account Info). Both are kept secret; never put them in GitHub or
+     chat. The Auth Token is also used to check that every call update really
+     came from Twilio, so anything else is ignored.
    - **Rep phone settings**, one entry per rep, keyed by Twenty login email:
      ```json
      {
        "ricky@beagleforpm.com": { "callerId": "+15551230000", "ringTo": "+15559870000" }
      }
      ```
-     `callerId` = a SignalWire number you bought, or a number verified in SignalWire
+     `callerId` = a Twilio number you bought, or a number verified in Twilio
      (Phone Numbers → Verified Caller IDs). `ringTo` = the phone to ring
      first (their cell or desk phone). Always use the +1XXXXXXXXXX format.
+4. Recordings: in Twilio, **Voice → Settings → General**, check "Enforce HTTP
+   Auth on media URLs". If it is on, the "Play recording" links will ask for
+   a login; turn it off for the links to play straight from Twenty.
 
 ## Updating after code changes
 
@@ -204,6 +201,6 @@ yarn test:unit
   (by choice, with no message). Federal rules cap these dropped calls at 3%
   of answered calls and expect a short message saying who called; check with
   whoever handles compliance. The "Call back" count shows how often it happens.
-- SignalWire's voicemail detection isn't perfect: now and then a person is treated
+- Twilio's voicemail detection isn't perfect: now and then a person is treated
   as a voicemail, or a voicemail is connected to the rep.
 - "Select all" on a huge view may only pass the records loaded on screen.

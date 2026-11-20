@@ -69,7 +69,7 @@ beforeEach(() => {
   for (const k of Object.keys(stored)) delete stored[k];
   for (const k of Object.keys(latestByRep)) delete latestByRep[k];
   for (const k of Object.keys(records)) delete records[k];
-  delete process.env.SIGNALWIRE_SIGNING_KEY;
+  delete process.env.TWILIO_AUTH_TOKEN;
   process.env.RECORDING_ANNOUNCEMENT = 'Hello. This call may be recorded.';
   stored['CA-parent'] = {
     callSid: 'CA-parent', workspaceMemberId: 'rep-1', personId: 'p1', prospectNumber: '+15551234567',
@@ -101,7 +101,7 @@ describe('calling instructions', () => {
   });
 
   it('ignores fake requests once a Auth Token is set', async () => {
-    process.env.SIGNALWIRE_API_TOKEN = 'key'; process.env.SIGNALWIRE_SIGNING_KEY = 'key'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_AUTH_TOKEN = 'key';
     const res = await run(whisper, { CallSid: 'CA-child' }, { 'x-twilio-signature': 'forged' });
     expect(res.status).toBe(403);
   });
@@ -140,7 +140,7 @@ describe('recordings', () => {
   });
 
   it('accepts a genuinely signed recording update when a Auth Token is set', async () => {
-    process.env.SIGNALWIRE_API_TOKEN = 'key'; process.env.SIGNALWIRE_SIGNING_KEY = 'key'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_AUTH_TOKEN = 'key';
     const params = { CallSid: 'CA-parent', RecordingStatus: 'completed', RecordingUrl: 'https://x/Recordings/r3' };
     const signature = signFormRequest('key', 'https://corgi-smb.withtwenty.com/dialer/recording-ready', params);
     await run(recordingReady, params, { 'x-twilio-signature': signature });
@@ -176,8 +176,8 @@ describe('call result on the record', () => {
 
 describe('starting a call creates the record right away', () => {
   it('as the rep, with their name, In progress', async () => {
-    process.env.SIGNALWIRE_PROJECT_ID = 'ACp';
-    process.env.SIGNALWIRE_API_TOKEN = 't'; process.env.SIGNALWIRE_SIGNING_KEY = 't'; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+    process.env.TWILIO_ACCOUNT_SID = 'ACp';
+    process.env.TWILIO_AUTH_TOKEN = 't';
     process.env.DIALER_REPS = JSON.stringify({ 'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' } });
     records['workspaceMembers:rep-1'] = { id: 'rep-1', userEmail: 'ricky@beagleforpm.com', name: { firstName: 'Ricky', lastName: 'Thomas' } };
     records['people:p1'] = { id: 'p1', name: { firstName: 'Jane', lastName: 'Doe' }, companyId: 'c1', phones: { primaryPhoneNumber: '5551234567', primaryPhoneCallingCode: '+1' } };

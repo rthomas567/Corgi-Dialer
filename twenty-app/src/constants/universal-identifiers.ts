@@ -1,16 +1,12 @@
 export const APP_DISPLAY_NAME = 'Corgi Dialer';
-export const APP_DESCRIPTION = 'Click-to-call dialer (SignalWire test version)';
+export const APP_DESCRIPTION = 'Click-to-call dialer powered by Twilio';
 
 export const APPLICATION_UNIVERSAL_IDENTIFIER = '4283439d-d91e-4af0-9c51-611f3daf9eb5';
 export const DEFAULT_ROLE_UNIVERSAL_IDENTIFIER = '41125f8d-7c5a-4eb6-a582-d2df94217be4';
 
 // Settings (application variables)
-// SignalWire test version: same IDs as the original SignalWire settings, so
-// the values already filled in Twenty are kept.
-export const VAR_SIGNALWIRE_SPACE_URL_ID = 'bdc49be4-d598-45f9-8949-2ed7e6705348';
-export const VAR_SIGNALWIRE_PROJECT_ID_ID = '87701c7f-cace-473d-9792-a43b5307713e';
-export const VAR_SIGNALWIRE_API_TOKEN_ID = '08aa755e-5da3-43b8-aa52-81779a440f61';
-export const VAR_SIGNALWIRE_SIGNING_KEY_ID = '001a00e7-2c6d-4d5b-b63e-db7e216464d9';
+export const VAR_TWILIO_ACCOUNT_SID_ID = '5291a1c4-21cb-4cd5-a0cf-1d4c4dd8fafa';
+export const VAR_TWILIO_AUTH_TOKEN_ID = '284f7a3b-605e-41b8-b21e-79e2e890f1cf';
 export const VAR_DIALER_REPS_ID = 'ca4221ba-2402-4830-be5a-f2f29fff7d79';
 
 // Server-side functions
@@ -147,3 +143,4 @@ export const ROUTE_QUEUE_ADD = '/dialer/queue/add';
 // Version 9: People tab in the company dialer
 export const COMPANY_PEOPLE_FUNCTION_ID = 'f24dd5a4-ad3b-42bb-b1d0-3348784d2eae';
 export const ROUTE_COMPANY_PEOPLE = '/dialer/company-people';
+

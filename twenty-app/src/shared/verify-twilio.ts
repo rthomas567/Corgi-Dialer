@@ -13,14 +13,13 @@ const rawBodyText = (event: RoutePayload): string | undefined => {
 };
 
 // True when the update should be trusted.
-// SignalWire signs updates with the Signing Key. If no Signing Key is set yet,
-// every update is accepted (setup/testing mode).
+// If no Auth Token is set yet, no calls can be started, so updates are accepted (setup/testing mode).
 export const isFromTwilio = (
   event: RoutePayload,
   routePath: string,
   formParams: Record<string, string>,
 ): boolean => {
-  const authToken = (process.env.SIGNALWIRE_SIGNING_KEY ?? '').trim();
+  const authToken = (process.env.TWILIO_AUTH_TOKEN ?? '').trim();
   if (!authToken) {
     return true;
   }

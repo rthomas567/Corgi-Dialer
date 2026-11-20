@@ -12,7 +12,7 @@ import { isFromTwilio } from 'src/shared/verify-twilio';
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_WHISPER, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
   const announcement = (process.env.RECORDING_ANNOUNCEMENT ?? '').trim();
   return twimlResponse(announcement ? `<Say>${escapeXml(announcement)}</Say>` : '');

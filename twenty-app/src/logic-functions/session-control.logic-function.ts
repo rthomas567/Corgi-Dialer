@@ -53,7 +53,7 @@ const handler = async (event: RoutePayload, context: LogicFunctionExecutionConte
 
   const twilio = readTwilioSettings();
   if (!twilio) {
-    return { ok: false as const, message: 'SignalWire is not set up.' };
+    return { ok: false as const, message: 'Twilio is not set up.' };
   }
 
   // Wait for any status check that is busy with this session.

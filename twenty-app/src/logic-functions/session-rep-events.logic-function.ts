@@ -13,12 +13,12 @@ import { isFromTwilio } from 'src/shared/verify-twilio';
 
 const FINISHED = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled']);
 
-// SignalWire reports on the rep's own phone line here. When it ends, the
+// Twilio reports on the rep's own phone line here. When it ends, the
 // session ends (the next status check hangs up anything still ringing).
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_SESSION_REP_EVENTS, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
   const status = (form.CallStatus || '').toLowerCase();
   const sessionId = form.CallSid ? await sessionIdForRepCall(form.CallSid) : null;

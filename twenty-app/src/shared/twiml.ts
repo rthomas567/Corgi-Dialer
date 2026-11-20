@@ -1,6 +1,6 @@
 import { Response } from 'twenty-sdk/logic-function';
 
-// SignalWire's call instructions ("TwiML") are XML.
+// Twilio's call instructions ("TwiML") are XML.
 export const escapeXml = (value: string) =>
   value
     .replace(/&/g, '&amp;')

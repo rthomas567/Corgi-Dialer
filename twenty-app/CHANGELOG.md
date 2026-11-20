@@ -4,10 +4,6 @@
 - Companies tab: each selected company with its phone number (or "No phone number") and a DO NOT CALL badge where it applies; dial the main lines as before.
 - People tab: everyone at each selected company with job title, phone, email and city. Call one person with their own Call button, or tick several and power / parallel dial them. Companies with nobody show "There are no people associated with this company."
 
-## SignalWire test version
-
-- Same as the Twilio version with power and parallel dialing, but runs on SignalWire (same settings as before).
-
 ## Power and parallel dialing
 
 - New "Start dialing" on People, Companies, and the new Call Queue: power (1 line) or parallel (2-5 lines).

@@ -1,6 +1,6 @@
 import type { RoutePayload } from 'twenty-sdk/logic-function';
 
-// SignalWire sends its updates as a web form (key=value&key=value).
+// Twilio sends its updates as a web form (key=value&key=value).
 // Depending on how Twenty hands the request over, it may arrive already
 // parsed or as raw text, so handle both.
 export const readFormBody = (event: RoutePayload): Record<string, string> => {

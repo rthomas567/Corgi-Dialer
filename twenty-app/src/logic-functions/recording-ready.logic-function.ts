@@ -12,10 +12,10 @@ import { SIGNATURE_HEADERS } from 'src/shared/twilio-signature';
 import { updateRecord } from 'src/shared/twenty-api';
 import { isFromTwilio } from 'src/shared/verify-twilio';
 
-// SignalWire calls this once a call's recording is ready. We attach a
+// Twilio calls this once a call's recording is ready. We attach a
 // "Play recording" link to the call's Dialer Call record.
-// SignalWire's recording files play without a login unless "Enforce HTTP Auth
-// on media URLs" is turned on in SignalWire's Voice settings; their addresses
+// Twilio's recording files play without a login unless "Enforce HTTP Auth
+// on media URLs" is turned on in Twilio's Voice settings; their addresses
 // are long and random, so they can't be guessed.
 export const toPlayableUrl = (recordingUrl: string) =>
   /\.(mp3|wav)$/i.test(recordingUrl) ? recordingUrl : `${recordingUrl}.mp3`;
@@ -23,7 +23,7 @@ export const toPlayableUrl = (recordingUrl: string) =>
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_RECORDING_READY, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
 
   const status = (form.RecordingStatus || 'completed').toLowerCase();

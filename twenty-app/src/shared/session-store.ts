@@ -7,8 +7,8 @@ import { kv } from 'twenty-sdk/logic-function';
 //   session:{id}       the list, where we are in it, and results so far.
 //                      Only changed by the rep's own screen (start, the
 //                      regular status check, pause, stop), one at a time.
-//   session-rep:{id}   the rep's own phone line. Changed by SignalWire updates.
-//   leg:{callSid}      one dialed prospect. Changed by SignalWire updates.
+//   session-rep:{id}   the rep's own phone line. Changed by Twilio updates.
+//   leg:{callSid}      one dialed prospect. Changed by Twilio updates.
 //   claim:{id}:{batch} which prospect got connected to the rep in a batch.
 
 export type TargetKind = 'person' | 'company' | 'queue';

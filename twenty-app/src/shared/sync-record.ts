@@ -3,7 +3,7 @@ import { callResultForEndReason } from 'src/shared/call-results';
 import { updateRecord } from 'src/shared/twenty-api';
 
 // Copies what happened on the phone line onto the call's Dialer Call record.
-// Runs as the app itself, because SignalWire's updates arrive with no user signed in.
+// Runs as the app itself, because Twilio's updates arrive with no user signed in.
 export const syncCallResult = async (call: StoredCall | null) => {
   if (!call?.loggedRecordId) {
     return;

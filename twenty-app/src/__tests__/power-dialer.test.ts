@@ -117,8 +117,8 @@ beforeEach(() => {
   lists = {};
   legCount = 0;
   createdCount = 0;
-  process.env.SIGNALWIRE_PROJECT_ID = 'ACtest';
-  process.env.SIGNALWIRE_API_TOKEN = TOKEN; process.env.SIGNALWIRE_SIGNING_KEY = TOKEN; process.env.SIGNALWIRE_SPACE_URL = 'corgi.signalwire.com';
+  process.env.TWILIO_ACCOUNT_SID = 'ACtest';
+  process.env.TWILIO_AUTH_TOKEN = TOKEN;
   process.env.RECORDING_ANNOUNCEMENT = 'This call may be recorded.';
   process.env.DIALER_REPS = JSON.stringify({
     'ricky@beagleforpm.com': { callerId: '+15550000000', ringTo: '+15559999999' },

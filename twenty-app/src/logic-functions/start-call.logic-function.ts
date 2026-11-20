@@ -72,7 +72,7 @@ const handler = async (
 
   const twilio = readTwilioSettings();
   if (!twilio) {
-    return fail('SignalWire is not set up yet. Ask an admin to fill in the SignalWire settings in Settings > Apps > Corgi Dialer.');
+    return fail('Twilio is not set up yet. Ask an admin to fill in the Twilio settings in Settings > Apps > Corgi Dialer.');
   }
 
   const member = await getRecord<WorkspaceMember>('workspaceMembers', workspaceMemberId);
@@ -113,7 +113,7 @@ const handler = async (
       eventsUrl: `${baseUrl}${ROUTE_CALL_EVENTS}`,
     });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : 'SignalWire could not start the call.');
+    return fail(error instanceof Error ? error.message : 'Twilio could not start the call.');
   }
 
   const createdAt = new Date().toISOString();

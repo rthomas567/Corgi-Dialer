@@ -45,7 +45,7 @@ describe('isGenuineTwilioRequest', () => {
     ).toBe(true);
   });
 
-  it('accepts the SignalWire header', () => {
+  it('ignores the old SignalWire header', () => {
     expect(
       isGenuineTwilioRequest({
         authToken: key,
@@ -53,7 +53,7 @@ describe('isGenuineTwilioRequest', () => {
         headers: { 'x-signalwire-signature': good },
         formParams: params,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('accepts a signature made with the :443 port in the address', () => {
@@ -92,12 +92,12 @@ describe('isGenuineTwilioRequest', () => {
 
 describe('isFromTwilio', () => {
   afterEach(() => {
-    delete process.env.SIGNALWIRE_SIGNING_KEY;
+    delete process.env.TWILIO_AUTH_TOKEN;
   });
 
   it('lets everything through while no Auth Token is set', async () => {
     const { isFromTwilio } = await import('src/shared/verify-twilio');
-    delete process.env.SIGNALWIRE_SIGNING_KEY;
+    delete process.env.TWILIO_AUTH_TOKEN;
     expect(
       isFromTwilio(
         {

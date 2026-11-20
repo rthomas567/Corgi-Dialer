@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
-// SignalWire signs every update it sends with your account's Auth Token
-// (header X-SignalWire-Signature). Checking it proves the update really came from SignalWire.
+// Twilio signs every update it sends with your account's Auth Token
+// (header X-Twilio-Signature). Checking it proves the update really came from Twilio.
 //
 // Form updates (what calls use) are signed like this:
 //   base64( HMAC-SHA1( authToken, fullUrl + each field name and value, sorted by name ) )
@@ -14,7 +14,7 @@ const safeEqual = (a: string, b: string) => {
   return bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB);
 };
 
-// SignalWire may sign the address with or without the default ":443" port.
+// Twilio may sign the address with or without the default ":443" port.
 const urlVariants = (url: string): string[] => {
   const variants = new Set([url]);
   try {
@@ -53,7 +53,7 @@ const readHeader = (headers: Record<string, string | undefined>, name: string) =
   return match ? headers[match] : undefined;
 };
 
-export const SIGNATURE_HEADERS = ['x-signalwire-signature', 'x-twilio-signature'];
+export const SIGNATURE_HEADERS = ['x-twilio-signature'];
 
 export const isGenuineTwilioRequest = (input: {
   authToken: string;
@@ -62,9 +62,7 @@ export const isGenuineTwilioRequest = (input: {
   formParams: Record<string, string>;
   rawBody?: string;
 }): boolean => {
-  const signature =
-    readHeader(input.headers, 'x-signalwire-signature') ??
-    readHeader(input.headers, 'x-twilio-signature');
+  const signature = readHeader(input.headers, 'x-twilio-signature');
   if (!signature) {
     return false;
   }

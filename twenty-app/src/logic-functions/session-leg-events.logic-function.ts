@@ -21,11 +21,11 @@ import { isFromTwilio } from 'src/shared/verify-twilio';
 
 const FINISHED = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled']);
 
-// SignalWire reports on each parallel line here: ringing, answered, ended.
+// Twilio reports on each parallel line here: ringing, answered, ended.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_SESSION_LEG_EVENTS, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
   const callSid = form.CallSid;
   const leg = callSid ? await getLeg(callSid) : null;
@@ -68,7 +68,7 @@ const handler = async (event: RoutePayload) => {
   }
 
   // Never reached the rep. A line we hung up ourselves shows as "completed"
-  // with nobody on it (canceled); someone who hung up while SignalWire was still
+  // with nobody on it (canceled); someone who hung up while Twilio was still
   // listening for a voicemail counts as no answer - unless we hung up on
   // them because another line got the rep, which needs a call back.
   let finalStatus: TargetStatus = finalStatusFromTwilio(status);

@@ -127,7 +127,7 @@ export default defineObject({
       universalIdentifier: DIALER_CALL_SID_FIELD_ID,
       type: FieldType.TEXT,
       name: 'signalWireCallId',
-      label: 'SignalWire call ID',
+      label: 'Twilio call ID',
       icon: 'IconId',
     },
     {

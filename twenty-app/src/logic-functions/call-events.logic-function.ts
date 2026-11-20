@@ -14,12 +14,12 @@ import { isFromTwilio } from 'src/shared/verify-twilio';
 
 const FINISHED = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled']);
 
-// SignalWire reports progress here: rep's phone ringing, rep answered,
+// Twilio reports progress here: rep's phone ringing, rep answered,
 // prospect ringing, prospect answered, call ended.
 const handler = async (event: RoutePayload) => {
   const form = readFormBody(event);
   if (!isFromTwilio(event, ROUTE_CALL_EVENTS, form)) {
-    return new Response('Not from SignalWire', { status: 403 });
+    return new Response('Not from Twilio', { status: 403 });
   }
   const status = (form.CallStatus || '').toLowerCase();
   const isProspectLeg = Boolean(form.ParentCallSid);
@@ -79,7 +79,7 @@ const handler = async (event: RoutePayload) => {
 export default defineLogicFunction({
   universalIdentifier: CALL_EVENTS_FUNCTION_ID,
   name: 'dialer-call-events',
-  description: 'Receives call progress updates from SignalWire.',
+  description: 'Receives call progress updates from Twilio.',
   handler,
   httpRouteTriggerSettings: {
     path: ROUTE_CALL_EVENTS,
